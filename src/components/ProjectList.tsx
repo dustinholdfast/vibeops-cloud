@@ -1,3 +1,5 @@
+'use client';
+
 import { useProjectStore } from '../store/useProjectStore';
 import {
   formatLastTouched,
@@ -75,7 +77,6 @@ export function ProjectList() {
           </span>
         </h2>
 
-        {/* Secondary filters: Health + Deadline */}
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-1.5" role="group" aria-label="Filter by health">
             <span className="text-[11px] uppercase tracking-wider text-text-dim mr-1">
@@ -145,7 +146,6 @@ export function ProjectList() {
       </div>
 
       <div className="rounded-xl border border-border bg-surface overflow-hidden">
-        {/* Header */}
         <div
           className="grid gap-3 px-4 py-2.5 text-[11px] font-medium tracking-wider text-text-dim uppercase border-b border-border-subtle"
           style={{
@@ -178,7 +178,6 @@ export function ProjectList() {
                     'minmax(180px,1.4fr) 100px 130px 110px 120px 100px 70px',
                 }}
               >
-                {/* Name + next action */}
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-text truncate">{project.name}</span>
@@ -194,7 +193,6 @@ export function ProjectList() {
                   </p>
                 </div>
 
-                {/* Stage */}
                 <div className="flex items-center">
                   <span className="inline-flex items-center gap-1.5 text-sm text-text-muted">
                     <span
@@ -205,7 +203,6 @@ export function ProjectList() {
                   </span>
                 </div>
 
-                {/* Priority pills */}
                 <div
                   className="flex items-center gap-1"
                   onClick={(e) => e.stopPropagation()}
@@ -229,7 +226,6 @@ export function ProjectList() {
                   ))}
                 </div>
 
-                {/* Health */}
                 <div
                   className="flex items-center"
                   onClick={(e) => e.stopPropagation()}
@@ -255,7 +251,6 @@ export function ProjectList() {
                   </select>
                 </div>
 
-                {/* Target date */}
                 <div className="flex items-center text-sm">
                   {deadline === 'none' ? (
                     <span className="text-text-dim italic text-xs">Set a target date</span>
@@ -271,13 +266,11 @@ export function ProjectList() {
                   )}
                 </div>
 
-                {/* Last touched */}
                 <div className="flex items-center gap-1.5 text-sm text-text-muted">
                   <span>{formatLastTouched(project.lastTouched)}</span>
                   <Check size={14} className="text-success" aria-hidden />
                 </div>
 
-                {/* Links */}
                 <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
                   {project.liveUrl ? (
                     <a
