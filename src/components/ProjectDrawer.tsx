@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useProjectStore } from '../store/useProjectStore';
@@ -102,7 +104,6 @@ export function ProjectDrawer() {
             transition={{ type: 'spring', damping: 28, stiffness: 320 }}
             className="fixed top-0 right-0 h-full w-full max-w-md bg-surface border-l border-border z-50 flex flex-col shadow-2xl"
           >
-            {/* Header */}
             <div className="flex items-start justify-between px-5 py-4 border-b border-border-subtle">
               <div className="min-w-0 flex-1">
                 <h2 id="drawer-title" className="text-lg font-semibold text-text truncate">
@@ -125,9 +126,7 @@ export function ProjectDrawer() {
               </button>
             </div>
 
-            {/* Body */}
             <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
-              {/* Stage */}
               <div>
                 <label
                   htmlFor="drawer-stage"
@@ -158,7 +157,6 @@ export function ProjectDrawer() {
                 </div>
               </div>
 
-              {/* Priority */}
               <div>
                 <span className="text-xs font-medium text-text-dim uppercase tracking-wider">
                   Priority
@@ -187,7 +185,6 @@ export function ProjectDrawer() {
                 </div>
               </div>
 
-              {/* Health */}
               <div>
                 <label
                   htmlFor="drawer-health"
@@ -212,7 +209,6 @@ export function ProjectDrawer() {
                 </p>
               </div>
 
-              {/* Target date */}
               <div>
                 <label
                   htmlFor="drawer-target"
@@ -262,7 +258,6 @@ export function ProjectDrawer() {
                 </p>
               </div>
 
-              {/* Next action */}
               <div>
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-medium text-text-dim uppercase tracking-wider">
@@ -334,7 +329,6 @@ export function ProjectDrawer() {
                 </div>
               </div>
 
-              {/* Progress — now editable */}
               <div>
                 <div className="flex items-center justify-between">
                   <label
@@ -368,7 +362,6 @@ export function ProjectDrawer() {
                 </div>
               </div>
 
-              {/* Links — editable */}
               <div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-text-dim uppercase tracking-wider">
@@ -465,7 +458,6 @@ export function ProjectDrawer() {
                 )}
               </div>
 
-              {/* Activity */}
               <div>
                 <span className="text-xs font-medium text-text-dim uppercase tracking-wider">
                   Activity
@@ -494,13 +486,12 @@ export function ProjectDrawer() {
               </div>
             </div>
 
-            {/* Footer */}
             <div className="px-5 py-4 border-t border-border-subtle flex items-center justify-between">
               <button
                 type="button"
                 onClick={() => {
                   if (confirm(`Delete “${project.name}”?`)) {
-                    deleteProject(project.id);
+                    void deleteProject(project.id);
                   }
                 }}
                 className="inline-flex items-center gap-1.5 text-sm text-danger hover:text-danger/80"

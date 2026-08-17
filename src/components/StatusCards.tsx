@@ -1,3 +1,5 @@
+'use client';
+
 import { useProjectStore, MAX_NOW_SLOTS } from '../store/useProjectStore';
 import { differenceInDays } from 'date-fns';
 import { cn, getDeadlineState } from '../lib/utils';
@@ -26,7 +28,6 @@ export function StatusCards() {
 
   const overNowLimit = nowProjects.length > MAX_NOW_SLOTS;
 
-  // Attention signals
   const overdue = projects.filter(
     (p) => getDeadlineState(p.targetDate, p.stage) === 'overdue'
   );
@@ -87,7 +88,6 @@ export function StatusCards() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* WORK ON THIS NOW */}
         <div
           className={cn(
             'rounded-xl border p-4 transition-all',
@@ -165,7 +165,6 @@ export function StatusCards() {
           )}
         </div>
 
-        {/* ROTTING */}
         <div className="rounded-xl border border-border bg-surface p-4">
           <h3 className="text-xs font-semibold tracking-wider text-text-muted uppercase mb-3">
             Rotting
@@ -180,13 +179,12 @@ export function StatusCards() {
           </p>
         </div>
 
-        {/* IN FLIGHT */}
         <div className="rounded-xl border border-border bg-surface p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-xs font-semibold tracking-wider text-text-muted uppercase">
               In flight
             </h3>
-            <span className="text-xs text-text-dim">local only</span>
+            <span className="text-xs text-text-dim">synced</span>
           </div>
           <div className="flex items-baseline gap-2 mb-3">
             <span className="text-4xl font-bold tabular-nums text-text">
@@ -225,7 +223,6 @@ export function StatusCards() {
         </div>
       </div>
 
-      {/* NEEDS ATTENTION */}
       <div className="rounded-xl border border-border bg-surface p-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-xs font-semibold tracking-wider text-text-muted uppercase">
