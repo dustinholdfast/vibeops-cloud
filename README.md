@@ -1,59 +1,111 @@
 # VibeOps Cloud
 
-**Hosted, multi-tenant edition of VibeOps** — same focused project tracker, with accounts, sync, and subscriptions.
+**Hosted, multi-tenant edition of VibeOps** — accounts, synced projects, subscriptions (coming).
 
-This repo is the Cloud product. The privacy-first, local-only edition lives at [dustinholdfast/vibeops](https://github.com/dustinholdfast/vibeops).
-
----
-
-## Status
-
-**Bootstrap phase.** The UI and domain logic are seeded from VibeOps Local v1.1.0. Next steps:
-
-1. Auth (Clerk or Supabase)
-2. Postgres + API (replace localStorage)
-3. Multi-tenant data model (`user_id` on projects)
-4. Stripe subscriptions
-5. Deploy to Vercel
-
-See the dual-product plan in project docs / conversation history.
+Local / offline edition: [dustinholdfast/vibeops](https://github.com/dustinholdfast/vibeops)
 
 ---
 
-## Current baseline (from Local)
+## Phase 3 status
 
-- Work on this Now (soft limit 3)
-- Rotting detector, In Flight, Needs Attention
-- Stages, priority, health, target dates, progress, links, activity
-- Export / Import JSON (will become Local → Cloud migration path)
-- Dark UI + logo mark
-
-Data still uses client-side Zustand + localStorage until the backend lands.
+| Layer | Status |
+|-------|--------|
+| Next.js App Router | ✅ |
+| Clerk auth (sign-in / sign-up / protect) | ✅ scaffold |
+| Landing + dashboard shell | ✅ |
+| Drizzle schema (`projects.user_id`) | ✅ |
+| REST API `/api/projects` | ✅ |
+| UI still on Zustand + localStorage | ⏳ next slice |
+| Stripe | Phase 4 |
 
 ---
 
-## Local development
+## Setup
+
+### 1. Clone & install
 
 ```bash
+git clone https://github.com/dustinholdfast/vibeops-cloud.git
+cd vibeops-cloud
+git checkout phase-3-scaffold   # until merged
 npm install
-npm run dev          # http://localhost:3001
-npm run typecheck
-npm test
 ```
+
+### 2. Environment
+
+```bash
+cp .env.example .env.local
+```
+
+Fill in:
+
+1. **Clerk** — [dashboard.clerk.com](https://dashboard.clerk.com) → create app → copy
+   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+   - `CLERK_SECRET_KEY`
+2. **Neon** (or any Postgres) — [console.neon.tech](https://console.neon.tech) → connection string
+   - `DATABASE_URL`
+
+### 3. Database
+
+```bash
+npm run db:push
+```
+
+### 4. Run
+
+```bash
+npm run dev
+# http://localhost:3001
+```
+
+- `/` — marketing / redirect if signed in  
+- `/sign-in`, `/sign-up` — Clerk  
+- `/dashboard` — app (auth required)  
+- `GET /api/health` — config check  
+- `GET|POST|PUT /api/projects` — multi-tenant CRUD (auth required)
 
 ---
 
-## Relationship to Local
+## Architecture (Phase 3)
 
-| | **VibeOps (Local)** | **VibeOps Cloud** |
-|--|---------------------|-------------------|
-| Data | Browser localStorage | Postgres, per-user |
-| Auth | None | Login required |
-| Hosting | Docker / self-host | Vercel |
-| Pricing | Free / open | Free tier + paid plans |
-| Promise | Nothing leaves the box | Convenience + sync |
+```
+app/                    Next.js App Router
+  page.tsx              Landing
+  sign-in / sign-up     Clerk hosted UI
+  dashboard/            Protected shell → existing UI
+  api/projects/         Multi-tenant REST API
+middleware.ts           Clerk route protection
+src/
+  db/                   Drizzle schema + mappers
+  components/           Client UI (from Local)
+  store/                Zustand (interim localStorage)
+  types/ lib/           Shared domain
+```
 
-Shared: UI components, domain types, deadline/priority rules.
+**Tenancy:** every project row has `user_id` = Clerk user id. API always filters by the authenticated user.
+
+**Interim data path:** the dashboard UI still reads/writes localStorage via Zustand. The API is ready; the next slice wires the store to `fetch('/api/projects')`.
+
+---
+
+## Client components note
+
+All files under `src/components/` that use hooks must start with:
+
+```ts
+'use client';
+```
+
+If you hit a Next.js error about hooks in a Server Component, add that directive to the top of the file.
+
+---
+
+## Deploy (Vercel)
+
+1. Import the GitHub repo in Vercel  
+2. Set the same env vars  
+3. Deploy  
+4. Add the production URL to Clerk allowed origins  
 
 ---
 
