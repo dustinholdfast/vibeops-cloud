@@ -9,18 +9,21 @@ export function getStripe(): Stripe {
     throw new Error('STRIPE_SECRET_KEY is not configured');
   }
   _stripe = new Stripe(key, {
-    apiVersion: '2025-01-27.acacia',
+    // Pin to a stable API version supported by stripe@17
+    apiVersion: '2024-11-20.acacia',
     typescript: true,
   });
   return _stripe;
 }
 
 export function getAppUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.VERCEL_URL?.replace(/^/, 'https://') ||
-    'http://localhost:3001'
-  ).replace(/\/$/, '');
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '');
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`.replace(/\/$/, '');
+  }
+  return 'http://localhost:3001';
 }
 
 export function getProPriceId(interval: 'month' | 'year'): string {
