@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useRef } from 'react';
 import { useProjectStore, MAX_NOW_SLOTS } from '../store/useProjectStore';
 import { format } from 'date-fns';
@@ -33,7 +35,7 @@ export function Header() {
 
   const handleAdd = () => {
     if (!newName.trim()) return;
-    addProject({ name: newName.trim() });
+    void addProject({ name: newName.trim() });
     setNewName('');
     setShowAdd(false);
   };
@@ -79,13 +81,12 @@ export function Header() {
         ) {
           return;
         }
-        importProjects(list);
+        void importProjects(list);
       } catch {
         alert('Could not parse the file as JSON.');
       }
     };
     reader.readAsText(file);
-    // reset so the same file can be chosen again
     e.target.value = '';
   };
 
