@@ -7,6 +7,14 @@ import { getStripe } from '@/src/lib/stripe';
 
 export const runtime = 'nodejs';
 
+function periodEndFromSub(sub: Stripe.Subscription): Date | null {
+  // API basil+: period lives on subscription items, not the subscription root
+  const end =
+    sub.items?.data?.[0]?.current_period_end ??
+    (sub as unknown as { current_period_end?: number }).current_period_end;
+  return typeof end === 'number' ? new Date(end * 1000) : null;
+}
+
 async function upsertFromSubscription(
   sub: Stripe.Subscription,
   clerkUserId?: string | null
@@ -27,6 +35,7 @@ async function upsertFromSubscription(
 
   const isActive = sub.status === 'active' || sub.status === 'trialing';
   const now = new Date();
+  const currentPeriodEnd = periodEndFromSub(sub);
 
   await db
     .insert(subscriptions)
@@ -37,7 +46,7 @@ async function upsertFromSubscription(
       stripePriceId: priceId,
       plan: isActive ? 'pro' : 'free',
       status: sub.status,
-      currentPeriodEnd: new Date(sub.current_period_end * 1000),
+      currentPeriodEnd,
       cancelAtPeriodEnd: sub.cancel_at_period_end ? 1 : 0,
       createdAt: now,
       updatedAt: now,
@@ -50,7 +59,7 @@ async function upsertFromSubscription(
         stripePriceId: priceId,
         plan: isActive ? 'pro' : 'free',
         status: sub.status,
-        currentPeriodEnd: new Date(sub.current_period_end * 1000),
+        currentPeriodEnd,
         cancelAtPeriodEnd: sub.cancel_at_period_end ? 1 : 0,
         updatedAt: now,
       },
