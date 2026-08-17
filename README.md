@@ -1,21 +1,19 @@
 # VibeOps Cloud
 
-**Hosted, multi-tenant edition of VibeOps** — accounts, synced projects, subscriptions (coming).
+**Hosted, multi-tenant edition of VibeOps** — accounts, synced projects, Stripe subscriptions.
 
-Local / offline edition: [dustinholdfast/vibeops](https://github.com/dustinholdfast/vibeops)
+Local edition: [dustinholdfast/vibeops](https://github.com/dustinholdfast/vibeops)
 
 ---
 
-## Phase 3 status
+## Phase status
 
 | Layer | Status |
 |-------|--------|
-| Next.js App Router | ✅ |
-| Clerk auth | ✅ |
-| Drizzle schema (`projects.user_id`) | ✅ |
-| REST API `/api/projects` | ✅ |
-| Store ↔ API (load + optimistic sync) | ✅ |
-| Stripe | Phase 4 |
+| Next.js + Clerk + Neon | ✅ |
+| Multi-tenant project API | ✅ |
+| Stripe Checkout + Portal + webhooks | ✅ Phase 4 |
+| Free (5 projects) / Pro (unlimited) | ✅ |
 
 ---
 
@@ -24,57 +22,62 @@ Local / offline edition: [dustinholdfast/vibeops](https://github.com/dustinholdf
 ```bash
 git clone https://github.com/dustinholdfast/vibeops-cloud.git
 cd vibeops-cloud
-git checkout phase-3-scaffold   # until merged to main
+git checkout phase-4-stripe   # until merged
 npm install
 cp .env.example .env.local
 ```
 
-### Environment (`.env.local`)
-
-1. **Clerk** — [dashboard.clerk.com](https://dashboard.clerk.com)
-   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
-   - `CLERK_SECRET_KEY`
-2. **Postgres** — e.g. [Neon](https://console.neon.tech)
-   - `DATABASE_URL`
+Fill Clerk, `DATABASE_URL`, and Stripe vars (see below).
 
 ```bash
-bash scripts/add-use-client.sh   # once: ensure 'use client' on components
 npm run db:push
-npm run dev                      # http://localhost:3001
+npm run dev   # http://localhost:3001
 ```
+
+### Stripe setup
+
+1. [dashboard.stripe.com](https://dashboard.stripe.com) → **Product** “VibeOps Pro”
+2. Add **two prices**: monthly $12, yearly $120 (or your amounts)
+3. Copy Price IDs → `STRIPE_PRICE_PRO_MONTHLY` / `STRIPE_PRICE_PRO_YEARLY`
+4. Copy Secret + Publishable keys
+5. **Customer portal**: Settings → Billing → Customer portal → enable
+6. **Webhooks** (local):
+   ```bash
+   stripe listen --forward-to localhost:3001/api/webhooks/stripe
+   ```
+   Put the `whsec_…` into `STRIPE_WEBHOOK_SECRET`
+7. **Webhooks** (production): endpoint `https://YOUR_DOMAIN/api/webhooks/stripe`  
+   Events: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`
+
+### Env
+
+See `.env.example` — includes `NEXT_PUBLIC_APP_URL` (local `http://localhost:3001` or your Vercel URL).
 
 ---
 
-## How data flows
+## Plans
 
-1. User signs in (Clerk)
-2. `/dashboard` calls `loadProjects()` → `GET /api/projects` (filtered by Clerk `userId`)
-3. UI mutations update Zustand optimistically, then `PATCH/POST/DELETE` the API
-4. **Import** from Local export uses `PUT /api/projects` (replaces that user’s rows)
+| Plan | Projects | Price |
+|------|----------|-------|
+| Free | 5 | $0 |
+| Pro | Unlimited | $12/mo or $120/yr |
+
+Limits enforced on `POST` / `PUT /api/projects`.
 
 ---
 
 ## Routes
 
-| Path | Purpose |
-|------|---------|
-| `/` | Landing / redirect if signed in |
-| `/sign-in`, `/sign-up` | Clerk |
-| `/dashboard` | App (auth required) |
-| `GET /api/health` | Env / readiness check |
-| `GET/POST/PUT /api/projects` | List / create / bulk import |
-| `GET/PATCH/DELETE /api/projects/[id]` | Single project |
+| Path | Notes |
+|------|-------|
+| `/pricing` | Public pricing + checkout |
+| `/api/billing/checkout` | Create Stripe Checkout session |
+| `/api/billing/portal` | Customer portal |
+| `/api/billing/status` | Current plan + usage |
+| `/api/webhooks/stripe` | Subscription sync |
 
 ---
 
-## Deploy (Vercel)
+## Deploy
 
-1. Import repo → set env vars  
-2. Deploy  
-3. Add production URL in Clerk (allowed origins / redirect URLs)  
-
----
-
-## License
-
-TBD for Cloud. Local remains MIT.
+Set all env vars on Vercel (including Stripe + `NEXT_PUBLIC_APP_URL`). After deploy, register the production webhook URL in Stripe.

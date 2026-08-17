@@ -26,11 +26,11 @@ export default async function HomePage() {
           </h1>
           <p className="text-text-muted text-base leading-relaxed">
             The same focused tracker as Local — with accounts, multi-device access,
-            and (soon) subscriptions. Sign in to open your workspace.
+            and Pro when you outgrow five projects.
           </p>
         </div>
 
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex items-center justify-center gap-3 flex-wrap">
           <Link
             href="/sign-in"
             className="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-purple hover:bg-purple-light text-white text-sm font-medium transition-colors"
@@ -42,6 +42,12 @@ export default async function HomePage() {
             className="inline-flex items-center justify-center px-5 py-2.5 rounded-lg border border-border bg-surface text-text text-sm font-medium hover:bg-surface-elevated transition-colors"
           >
             Create account
+          </Link>
+          <Link
+            href="/pricing"
+            className="inline-flex items-center justify-center px-5 py-2.5 rounded-lg text-sm font-medium text-purple-light hover:underline"
+          >
+            Pricing
           </Link>
         </div>
 
