@@ -8,9 +8,9 @@ export function getStripe(): Stripe {
   if (!key) {
     throw new Error('STRIPE_SECRET_KEY is not configured');
   }
+  // Omit apiVersion so stripe-node uses the version pinned by the installed SDK
+  // (avoids TS mismatch across minor stripe package updates).
   _stripe = new Stripe(key, {
-    // Pin to a stable API version supported by stripe@17
-    apiVersion: '2024-11-20.acacia',
     typescript: true,
   });
   return _stripe;
