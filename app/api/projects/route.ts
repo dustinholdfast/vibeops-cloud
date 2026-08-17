@@ -6,6 +6,8 @@ import { projects } from '@/src/db/schema';
 import { dbProjectToDomain, domainToDbInsert } from '@/src/db/map';
 import type { Project } from '@/src/types';
 import { generateId } from '@/src/lib/utils';
+import { assertCanCreateProject, getUserPlan } from '@/src/lib/subscription';
+import { canCreateProject } from '@/src/lib/plans';
 
 export async function GET() {
   const { userId } = await auth();
@@ -37,6 +39,19 @@ export async function POST(req: Request) {
   }
 
   try {
+    const gate = await assertCanCreateProject(userId);
+    if (!gate.allowed) {
+      return NextResponse.json(
+        {
+          error: `Free plan allows ${gate.limit} projects. Upgrade to Pro for unlimited.`,
+          code: 'PLAN_LIMIT',
+          limit: gate.limit,
+          count: gate.count,
+        },
+        { status: 402 }
+      );
+    }
+
     const body = await req.json();
     const now = new Date().toISOString();
 
@@ -97,6 +112,21 @@ export async function PUT(req: Request) {
       : Array.isArray(body?.projects)
         ? body.projects
         : [];
+
+    const { plan } = await getUserPlan(userId);
+    const gate = canCreateProject(plan, list.length);
+    // For import, limit applies to the resulting set size (0 is always ok)
+    if (list.length > 0 && !gate.ok) {
+      return NextResponse.json(
+        {
+          error: `Import has ${list.length} projects; Free plan allows ${gate.limit}. Upgrade to Pro or import fewer.`,
+          code: 'PLAN_LIMIT',
+          limit: gate.limit,
+          count: list.length,
+        },
+        { status: 402 }
+      );
+    }
 
     const db = requireDb();
 

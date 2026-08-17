@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
 import type { FilterStage } from '../types';
 import { cn } from '../lib/utils';
+import { BillingBadge } from './BillingBadge';
 import {
   LayoutGrid,
   Compass,
@@ -12,7 +13,6 @@ import {
   Rocket,
   PauseCircle,
   Archive,
-  Circle,
 } from 'lucide-react';
 
 const stages: { key: FilterStage; label: string; icon: ReactNode }[] = [
@@ -87,15 +87,7 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="px-4 py-4 border-t border-border-subtle">
-        <div className="flex items-center gap-2 text-xs text-text-dim">
-          <Circle size={8} className="text-success fill-success" />
-          <span>Cloud · Phase 3</span>
-        </div>
-        <p className="mt-1 text-[11px] text-text-dim leading-tight">
-          Auth on. API ready. Store wiring next.
-        </p>
-      </div>
+      <BillingBadge />
     </aside>
   );
 }
