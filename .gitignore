@@ -1,0 +1,27 @@
+# deps
+node_modules
+.pnp
+.pnp.js
+
+# next
+.next
+out
+
+# env
+.env
+.env.local
+.env.*.local
+
+# debug / ide
+npm-debug.log*
+.DS_Store
+*.pem
+.vscode
+.idea
+
+# typescript
+next-env.d.ts
+*.tsbuildinfo
+
+# drizzle
+drizzle/meta
