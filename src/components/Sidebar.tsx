@@ -1,3 +1,5 @@
+'use client';
+
 import type { ReactNode } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
 import type { FilterStage } from '../types';
@@ -32,12 +34,16 @@ export function Sidebar() {
       acc[p.stage]++;
       return acc;
     },
-    { All: 0, Exploring: 0, Building: 0, Testing: 0, Live: 0, Paused: 0, Archived: 0 } as Record<FilterStage, number>
+    { All: 0, Exploring: 0, Building: 0, Testing: 0, Live: 0, Paused: 0, Archived: 0 } as Record<
+      FilterStage,
+      number
+    >
   );
 
   return (
     <aside className="w-56 flex-shrink-0 bg-surface border-r border-border-subtle flex flex-col h-full">
       <div className="px-4 py-5 flex items-center gap-2.5">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/logo.svg"
           alt="VibeOps"
@@ -83,11 +89,11 @@ export function Sidebar() {
 
       <div className="px-4 py-4 border-t border-border-subtle">
         <div className="flex items-center gap-2 text-xs text-text-dim">
-          <Circle size={8} className="text-warning fill-warning" />
-          <span>Cloud · bootstrap</span>
+          <Circle size={8} className="text-success fill-success" />
+          <span>Cloud · Phase 3</span>
         </div>
         <p className="mt-1 text-[11px] text-text-dim leading-tight">
-          Auth & multi-tenant backend coming next.
+          Auth on. API ready. Store wiring next.
         </p>
       </div>
     </aside>
