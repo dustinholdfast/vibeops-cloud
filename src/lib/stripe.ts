@@ -8,9 +8,9 @@ export function getStripe(): Stripe {
   if (!key) {
     throw new Error('STRIPE_SECRET_KEY is not configured');
   }
-  // Omit apiVersion so stripe-node uses the version pinned by the installed SDK
-  // (avoids TS mismatch across minor stripe package updates).
+  // stripe@18 pins API version 2025-08-27.basil (required for Managed Payments)
   _stripe = new Stripe(key, {
+    apiVersion: '2025-08-27.basil',
     typescript: true,
   });
   return _stripe;
