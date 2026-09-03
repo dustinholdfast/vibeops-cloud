@@ -3,7 +3,8 @@
 import { useState, useRef } from 'react';
 import { useProjectStore, MAX_NOW_SLOTS } from '../store/useProjectStore';
 import { format } from 'date-fns';
-import { Search, Plus, Download, Upload } from 'lucide-react';
+import { Search, Plus, Download, Upload, Sun, Moon } from 'lucide-react';
+import { useTheme } from '../lib/useTheme';
 import type { Project } from '../types';
 
 export function Header() {
@@ -18,6 +19,8 @@ export function Header() {
   const [newName, setNewName] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === 'dark';
 
   const nowProjects = projects.filter((p) => p.priority === 'Now');
   const nowCount = nowProjects.length;
@@ -101,6 +104,17 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
+            aria-pressed={isDark}
+            title={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
+            className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-surface border border-border text-text-muted hover:text-text transition-colors"
+          >
+            {isDark ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-dim" />
             <input

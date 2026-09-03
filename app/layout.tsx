@@ -13,6 +13,25 @@ export const metadata: Metadata = {
 // NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is not present at build time (local/CI).
 export const dynamic = 'force-dynamic';
 
+const THEME_INIT_SCRIPT = `(function () {
+  try {
+    var stored = localStorage.getItem('vibeops-theme');
+    var theme =
+      stored === 'light' || stored === 'dark'
+        ? stored
+        : window.matchMedia('(prefers-color-scheme: light)').matches
+          ? 'light'
+          : 'dark';
+    var root = document.documentElement;
+    root.classList.remove('light', 'dark');
+    root.classList.add(theme);
+    root.style.colorScheme = theme;
+  } catch (e) {
+    document.documentElement.classList.add('dark');
+    document.documentElement.style.colorScheme = 'dark';
+  }
+})();`;
+
 export default function RootLayout({
   children,
 }: {
@@ -21,8 +40,9 @@ export default function RootLayout({
   const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
   const html = (
-    <html lang="en" className="h-full">
+    <html lang="en" className="h-full dark" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"
