@@ -9,13 +9,44 @@ export const metadata: Metadata = {
   icons: { icon: '/favicon.svg' },
 };
 
+// Auth/billing routes need a request; also avoids prerender crashing when
+// NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is not present at build time (local/CI).
+export const dynamic = 'force-dynamic';
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+  const html = (
+    <html lang="en" className="h-full">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="h-full bg-background text-text antialiased">
+        {children}
+      </body>
+    </html>
+  );
+
+  if (!publishableKey) {
+    return html;
+  }
+
   return (
     <ClerkProvider
+      publishableKey={publishableKey}
       appearance={{
         baseTheme: dark,
         variables: {
@@ -26,23 +57,7 @@ export default function RootLayout({
         },
       }}
     >
-      <html lang="en" className="h-full">
-        <head>
-          <link rel="preconnect" href="https://fonts.googleapis.com" />
-          <link
-            rel="preconnect"
-            href="https://fonts.gstatic.com"
-            crossOrigin="anonymous"
-          />
-          <link
-            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-            rel="stylesheet"
-          />
-        </head>
-        <body className="h-full bg-background text-text antialiased">
-          {children}
-        </body>
-      </html>
+      {html}
     </ClerkProvider>
   );
 }
