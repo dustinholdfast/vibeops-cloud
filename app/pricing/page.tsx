@@ -1,10 +1,10 @@
 import Link from 'next/link';
-import { auth } from '@clerk/nextjs/server';
 import { PLANS } from '@/src/lib/plans';
+import { getOptionalUserId } from '@/src/lib/auth';
 import { PricingActions } from './PricingActions';
 
 export default async function PricingPage() {
-  const { userId } = await auth();
+  const userId = await getOptionalUserId();
 
   return (
     <div className="min-h-full px-6 py-12">

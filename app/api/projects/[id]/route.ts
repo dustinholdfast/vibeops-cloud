@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { requireDb } from '@/src/db';
 import { projects } from '@/src/db/schema';
 import { dbProjectToDomain } from '@/src/db/map';
+import { isRecord } from '@/src/lib/validation';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -43,7 +44,11 @@ export async function PATCH(req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
 
   try {
-    const body = await req.json();
+    const parsed: unknown = await req.json();
+    if (!isRecord(parsed)) {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+    const body = parsed;
     const db = requireDb();
 
     const [existing] = await db

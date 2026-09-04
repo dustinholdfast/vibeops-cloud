@@ -8,6 +8,39 @@ import type { Project } from '@/src/types';
 import { generateId } from '@/src/lib/utils';
 import { assertCanCreateProject, getUserPlan } from '@/src/lib/subscription';
 import { canCreateProject } from '@/src/lib/plans';
+import { isRecord } from '@/src/lib/validation';
+
+function isStage(value: unknown): value is Project['stage'] {
+  return (
+    typeof value === 'string' &&
+    ['Exploring', 'Building', 'Testing', 'Live', 'Paused', 'Archived'].includes(value)
+  );
+}
+
+function isPriority(value: unknown): value is Project['priority'] {
+  return typeof value === 'string' && ['Now', 'Next', 'Later'].includes(value);
+}
+
+function isHealth(value: unknown): value is Project['health'] {
+  return typeof value === 'string' && ['On track', 'At risk', 'Blocked'].includes(value);
+}
+
+function isProject(value: unknown): value is Project {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.name === 'string' &&
+    typeof value.nextAction === 'string' &&
+    isStage(value.stage) &&
+    isPriority(value.priority) &&
+    isHealth(value.health) &&
+    (value.targetDate === null || typeof value.targetDate === 'string') &&
+    typeof value.lastTouched === 'string' &&
+    typeof value.createdAt === 'string' &&
+    typeof value.progress === 'number' &&
+    Array.isArray(value.activity)
+  );
+}
 
 export async function GET() {
   const { userId } = await auth();
@@ -52,7 +85,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const body = await req.json();
+    const parsed: unknown = await req.json();
+    const body = isRecord(parsed) ? parsed : {};
     const now = new Date().toISOString();
 
     const project: Project = {
@@ -62,14 +96,14 @@ export async function POST(req: Request) {
         typeof body.nextAction === 'string'
           ? body.nextAction
           : 'Define the first slice',
-      stage: body.stage || 'Exploring',
-      priority: body.priority || 'Later',
-      health: body.health || 'On track',
-      targetDate: body.targetDate ?? null,
+      stage: isStage(body.stage) ? body.stage : 'Exploring',
+      priority: isPriority(body.priority) ? body.priority : 'Later',
+      health: isHealth(body.health) ? body.health : 'On track',
+      targetDate: typeof body.targetDate === 'string' ? body.targetDate : null,
       lastTouched: now,
       createdAt: now,
-      liveUrl: body.liveUrl,
-      repoUrl: body.repoUrl,
+      liveUrl: typeof body.liveUrl === 'string' ? body.liveUrl : undefined,
+      repoUrl: typeof body.repoUrl === 'string' ? body.repoUrl : undefined,
       progress: typeof body.progress === 'number' ? body.progress : 0,
       activity: [
         {
@@ -106,12 +140,21 @@ export async function PUT(req: Request) {
   }
 
   try {
-    const body = await req.json();
-    const list: Project[] = Array.isArray(body)
+    const body: unknown = await req.json();
+    const candidates: unknown[] = Array.isArray(body)
       ? body
-      : Array.isArray(body?.projects)
+      : isRecord(body) && Array.isArray(body.projects)
         ? body.projects
         : [];
+
+    if (!candidates.every(isProject)) {
+      return NextResponse.json(
+        { error: 'Import contains an invalid project' },
+        { status: 400 }
+      );
+    }
+
+    const list: Project[] = candidates;
 
     const { plan } = await getUserPlan(userId);
     const gate = canCreateProject(plan, list.length);

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import type { PlanId } from '@/src/lib/plans';
+import { parseJson } from '@/src/lib/api';
 
 export function PricingActions({
   planId,
@@ -46,8 +47,7 @@ export function PricingActions({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ interval }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Checkout failed');
+      const data = await parseJson<{ url?: string }>(res);
       if (data.url) window.location.href = data.url;
       else throw new Error('No checkout URL returned');
     } catch (e) {

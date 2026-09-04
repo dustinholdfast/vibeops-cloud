@@ -5,6 +5,7 @@ import { requireDb } from '@/src/db';
 import { subscriptions } from '@/src/db/schema';
 import { getStripe, getAppUrl, getProPriceId } from '@/src/lib/stripe';
 import { ensureSubscriptionRow } from '@/src/lib/subscription';
+import { isRecord } from '@/src/lib/validation';
 
 export async function POST(req: Request) {
   const { userId } = await auth();
@@ -13,7 +14,8 @@ export async function POST(req: Request) {
   }
 
   try {
-    const body = await req.json().catch(() => ({}));
+    const parsed: unknown = await req.json().catch(() => ({}));
+    const body = isRecord(parsed) ? parsed : {};
     const interval: 'month' | 'year' =
       body.interval === 'year' ? 'year' : 'month';
 

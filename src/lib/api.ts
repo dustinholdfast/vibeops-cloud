@@ -1,6 +1,6 @@
 import type { Project } from '@/src/types';
 
-async function parseJson<T>(res: Response): Promise<T> {
+export async function parseJson<T>(res: Response): Promise<T> {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const msg =

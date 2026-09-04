@@ -7,6 +7,10 @@ node_modules
 .next
 out
 
+# cloudflare
+.open-next
+.wrangler
+
 # env
 .env
 .env.local

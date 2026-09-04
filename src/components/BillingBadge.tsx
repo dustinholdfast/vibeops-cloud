@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { parseJson } from '@/src/lib/api';
 
 type Status = {
   plan: 'free' | 'pro';
@@ -16,7 +17,7 @@ export function BillingBadge() {
 
   useEffect(() => {
     void fetch('/api/billing/status', { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => (r.ok ? parseJson<Status>(r) : null))
       .then((d) => {
         if (d && d.plan) setStatus(d);
       })
@@ -30,7 +31,7 @@ export function BillingBadge() {
         method: 'POST',
         credentials: 'include',
       });
-      const data = await res.json();
+      const data = await parseJson<{ url?: string; error?: string }>(res);
       if (data.url) window.location.href = data.url;
       else alert(data.error || 'Could not open billing portal');
     } catch {

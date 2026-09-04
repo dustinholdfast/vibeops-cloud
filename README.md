@@ -78,6 +78,22 @@ Limits enforced on `POST` / `PUT /api/projects`.
 
 ---
 
-## Deploy
+## Deploy to Cloudflare Workers
 
-Set all env vars on Vercel (including Stripe + `NEXT_PUBLIC_APP_URL`). After deploy, register the production webhook URL in Stripe.
+This repository is configured for Cloudflare Workers through OpenNext.
+
+```bash
+npm install
+npm run typecheck
+npm run build:worker
+npm run preview:worker
+```
+
+For Cloudflare Workers Builds, use:
+
+- Production branch: `main`
+- Build command: `npm run build:worker`
+- Deploy command: `npx wrangler deploy`
+- Root directory: `/`
+
+Configure every value from `.env.example` as a Cloudflare runtime variable or secret. The `NEXT_PUBLIC_` values must also be available during the build. Set `NEXT_PUBLIC_APP_URL` to the production Worker or custom-domain URL, then register `https://YOUR_DOMAIN/api/webhooks/stripe` as the Stripe webhook endpoint.
