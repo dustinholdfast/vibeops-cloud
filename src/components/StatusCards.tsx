@@ -8,6 +8,8 @@ import type { Project } from '../types';
 export function StatusCards() {
   const { projects, openDrawer, setFilter, setHealthFilter, setDeadlineFilter } =
     useProjectStore();
+  const drafts = useProjectStore((s) => s.drafts);
+  const saving = Object.values(drafts).some((d) => d.status === 'saving');
 
   const nowProjects = projects.filter((p) => p.priority === 'Now');
   const rotting = projects.filter((p) => {
@@ -184,7 +186,7 @@ export function StatusCards() {
             <h3 className="text-xs font-semibold tracking-wider text-text-muted uppercase">
               In flight
             </h3>
-            <span className="text-xs text-text-dim">synced</span>
+            <span className="text-xs text-text-dim" role="status">{saving ? 'Saving…' : Object.keys(drafts).length ? 'Unsaved changes' : 'Saved'}</span>
           </div>
           <div className="flex items-baseline gap-2 mb-3">
             <span className="text-4xl font-bold tabular-nums text-text">

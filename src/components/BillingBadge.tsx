@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { parseJson } from '@/src/lib/api';
+import { useProjectStore } from '../store/useProjectStore';
 
 type Status = {
   plan: 'free' | 'pro';
@@ -14,15 +15,23 @@ type Status = {
 export function BillingBadge() {
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
+  const projectCount = useProjectStore((s) => s.projects.length);
+  const [loadError, setLoadError] = useState(false);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
+    let active = true;
+    setLoadError(false);
     void fetch('/api/billing/status', { credentials: 'include' })
       .then((r) => (r.ok ? parseJson<Status>(r) : null))
       .then((d) => {
+        if (!active) return;
         if (d && d.plan) setStatus(d);
+        else setLoadError(true);
       })
-      .catch(() => {});
-  }, []);
+      .catch(() => { if (active) setLoadError(true); });
+    return () => { active = false; };
+  }, [projectCount, retry]);
 
   const openPortal = async () => {
     setBusy(true);
@@ -44,7 +53,8 @@ export function BillingBadge() {
   if (!status) {
     return (
       <div className="px-4 py-3 border-t border-border-subtle">
-        <p className="text-[11px] text-text-dim">Loading plan…</p>
+        <p className="text-[11px] text-text-dim">{loadError ? 'Could not load plan.' : 'Loading plan…'}</p>
+        {loadError && <button type="button" className="text-xs underline" onClick={() => setRetry((n) => n + 1)}>Retry</button>}
       </div>
     );
   }

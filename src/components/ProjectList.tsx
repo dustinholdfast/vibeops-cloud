@@ -10,7 +10,8 @@ import {
   HEALTH_OPTIONS,
 } from '../lib/utils';
 import type { Priority, Stage, Health, DeadlineState } from '../types';
-import { Check, ExternalLink } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
+import { SaveStatusChip } from './SaveStatus';
 
 const stageColor: Record<Stage, string> = {
   Exploring: 'bg-blue',
@@ -266,9 +267,9 @@ export function ProjectList() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-1.5 text-sm text-text-muted">
+                <div className="flex flex-col gap-1.5 text-sm text-text-muted">
                   <span>{formatLastTouched(project.lastTouched)}</span>
-                  <Check size={14} className="text-success" aria-hidden />
+                  <SaveStatusChip id={project.id} />
                 </div>
 
                 <div className="flex items-center" onClick={(e) => e.stopPropagation()}>

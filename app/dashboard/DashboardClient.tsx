@@ -8,21 +8,35 @@ import { StatusCards } from '@/src/components/StatusCards';
 import { ProjectList } from '@/src/components/ProjectList';
 import { ProjectDrawer } from '@/src/components/ProjectDrawer';
 import { useProjectStore } from '@/src/store/useProjectStore';
+import { WorkspaceSaveNotice } from '@/src/components/SaveStatus';
 
-export function DashboardClient() {
+export function DashboardClient({ userId }: { userId: string }) {
   const loadProjects = useProjectStore((s) => s.loadProjects);
   const loadStatus = useProjectStore((s) => s.loadStatus);
   const loadError = useProjectStore((s) => s.loadError);
 
   useEffect(() => {
-    void loadProjects();
-  }, [loadProjects]);
+    void loadProjects(userId);
+  }, [loadProjects, userId]);
+
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => {
+      const state = useProjectStore.getState();
+      if (Object.keys(state.drafts).length || state.creation || state.operationBusy) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, []);
 
   return (
     <div className="flex h-full bg-background text-text overflow-hidden">
       <Sidebar />
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <WorkspaceSaveNotice />
         <div className="flex items-center justify-end gap-3 px-6 pt-4">
           <UserButton
             afterSignOutUrl="/"
@@ -42,7 +56,7 @@ export function DashboardClient() {
           <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 text-center">
             <p className="text-sm text-danger font-medium">Could not load projects</p>
             <p className="text-xs text-text-dim max-w-md">
-              {loadError || 'Check DATABASE_URL and that you ran npm run db:push.'}
+              {loadError || 'Please try again in a moment.'}
             </p>
             <button
               type="button"
