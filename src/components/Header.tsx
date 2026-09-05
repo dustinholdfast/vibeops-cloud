@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useProjectStore, MAX_NOW_SLOTS } from '../store/useProjectStore';
 import { format } from 'date-fns';
 import { Search, Plus, Download, Upload, Sun, Moon } from 'lucide-react';
@@ -15,12 +15,20 @@ export function Header() {
     projects,
     getExportPayload,
     importProjects,
+    creation,
+    creating,
+    operationBusy,
+    cancelCreation,
+    reportError,
   } = useProjectStore();
   const [newName, setNewName] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === 'dark';
+  useEffect(() => {
+    if (creation) { setNewName(creation.name); setShowAdd(true); }
+  }, [creation]);
 
   const nowProjects = projects.filter((p) => p.priority === 'Now');
   const nowCount = nowProjects.length;
@@ -36,11 +44,12 @@ export function Header() {
     heading = `${nowCount} projects claimed (over the ${MAX_NOW_SLOTS}-slot soft limit)`;
   }
 
-  const handleAdd = () => {
-    if (!newName.trim()) return;
-    void addProject({ name: newName.trim() });
-    setNewName('');
-    setShowAdd(false);
+  const handleAdd = async () => {
+    if (!newName.trim() || creating || operationBusy) return;
+    if (await addProject({ name: newName.trim() })) {
+      setNewName('');
+      setShowAdd(false);
+    }
   };
 
   const handleExport = () => {
@@ -65,29 +74,34 @@ export function Header() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onerror = () => reportError('Could not read that file. Try selecting it again.');
+    reader.onload = async () => {
+      let list: Project[];
       try {
         const raw = JSON.parse(String(reader.result));
-        let list: Project[] = [];
         if (Array.isArray(raw)) {
           list = raw;
         } else if (raw && Array.isArray(raw.projects)) {
           list = raw.projects;
         } else {
-          alert('Invalid export file: expected an array of projects or { projects: [...] }.');
+          reportError(
+            'That file is not a VibeOps export: expected an array of projects or { projects: [...] }.'
+          );
           return;
         }
-        if (
-          !confirm(
-            `Import ${list.length} project${list.length === 1 ? '' : 's'}? This will replace your current data.`
-          )
-        ) {
-          return;
-        }
-        void importProjects(list);
       } catch {
-        alert('Could not parse the file as JSON.');
+        reportError('Could not parse that file as JSON. Your workspace is unchanged.');
+        return;
       }
+      if (
+        !confirm(
+          `Import ${list.length} project${list.length === 1 ? '' : 's'}? This will replace your current data.`
+        )
+      ) {
+        return;
+      }
+      // importProjects reports its own failures and leaves current data intact.
+      await importProjects(list);
     };
     reader.readAsText(file);
     e.target.value = '';
@@ -139,6 +153,7 @@ export function Header() {
           <button
             type="button"
             onClick={handleImportClick}
+            disabled={operationBusy || creating}
             className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-surface border border-border text-text-muted hover:text-text text-sm transition-colors"
             title="Import projects from JSON"
           >
@@ -160,21 +175,24 @@ export function Header() {
                 type="text"
                 placeholder="New project name…"
                 value={newName}
+                disabled={creating || Boolean(creation)}
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleAdd();
-                  if (e.key === 'Escape') setShowAdd(false);
+                  if (e.key === 'Escape' && !creating) { cancelCreation(); setShowAdd(false); }
                 }}
                 className="w-48 px-3 py-2 rounded-lg bg-surface border border-border text-sm text-text placeholder:text-text-dim focus:outline-none focus:border-purple/50"
               />
               <button
                 onClick={handleAdd}
+                disabled={creating || operationBusy}
                 className="px-3 py-2 rounded-lg bg-purple hover:bg-purple-light text-white text-sm font-medium transition-colors"
               >
-                Add
+                {creating ? 'Saving…' : creation ? 'Retry' : 'Add'}
               </button>
               <button
-                onClick={() => setShowAdd(false)}
+                disabled={creating}
+                onClick={() => { cancelCreation(); setShowAdd(false); }}
                 className="px-2 py-2 text-text-dim hover:text-text text-sm"
               >
                 Cancel

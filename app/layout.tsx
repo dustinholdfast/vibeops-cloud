@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { ClerkProvider } from '@clerk/nextjs';
 import { dark } from '@clerk/themes';
 import './globals.css';
+import { DraftSession } from '@/src/components/DraftSession';
 
 export const metadata: Metadata = {
   title: 'VibeOps Cloud',
@@ -55,6 +56,7 @@ export default function RootLayout({
         />
       </head>
       <body className="h-full bg-background text-text antialiased">
+        {publishableKey && <DraftSession />}
         {children}
       </body>
     </html>

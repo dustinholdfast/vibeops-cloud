@@ -15,6 +15,7 @@ import {
 } from '../lib/utils';
 import type { Stage, Priority, Health } from '../types';
 import { X, ExternalLink, Github, Pencil, Check, Trash2, Hand } from 'lucide-react';
+import { SaveStatus } from './SaveStatus';
 
 const stages: Stage[] = ['Exploring', 'Building', 'Testing', 'Live', 'Paused', 'Archived'];
 const priorities: Priority[] = ['Now', 'Next', 'Later'];
@@ -127,6 +128,7 @@ export function ProjectDrawer() {
             </div>
 
             <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
+              <SaveStatus id={project.id} />
               <div>
                 <label
                   htmlFor="drawer-stage"

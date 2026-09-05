@@ -4,6 +4,7 @@ import type { DbProject, NewDbProject } from './schema';
 export function dbProjectToDomain(row: DbProject): Project {
   return {
     id: row.id,
+    version: row.version,
     name: row.name,
     nextAction: row.nextAction,
     stage: row.stage as Project['stage'],

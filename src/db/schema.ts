@@ -15,6 +15,8 @@ export const projects = pgTable(
   'projects',
   {
     id: text('id').primaryKey(),
+    version: integer('version').notNull().default(1),
+    lastMutationId: text('last_mutation_id'),
     userId: text('user_id').notNull(),
     name: text('name').notNull(),
     nextAction: text('next_action').notNull().default('Define the first slice'),

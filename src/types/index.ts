@@ -13,6 +13,7 @@ export interface ActivityItem {
 }
 
 export interface Project {
+  version?: number;
   id: string;
   name: string;
   nextAction: string;
@@ -22,8 +23,8 @@ export interface Project {
   targetDate: string | null; // YYYY-MM-DD (local calendar date)
   lastTouched: string; // ISO datetime
   createdAt: string;
-  liveUrl?: string;
-  repoUrl?: string;
+  liveUrl?: string | null;
+  repoUrl?: string | null;
   progress: number; // 0-100
   activity: ActivityItem[];
 }

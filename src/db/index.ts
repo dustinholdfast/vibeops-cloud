@@ -24,3 +24,11 @@ export function requireDb() {
   }
   return db;
 }
+
+/**
+ * Closes the connection pool. The server keeps it open for the process lifetime;
+ * short-lived scripts and test harnesses call this so the process can exit.
+ */
+export async function closeDb() {
+  if (client) await client.end({ timeout: 5 });
+}

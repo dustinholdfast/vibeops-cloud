@@ -15,7 +15,9 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "test": "npx tsx src/lib/deadline.test.ts"
+    "test": "tsx src/lib/deadline.test.ts && tsx src/store/useProjectStore.test.ts",
+    "test:db": "node scripts/test-db.mjs",
+    "typecheck:tests": "tsc -p tsconfig.test.json --noEmit"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.12.0",
