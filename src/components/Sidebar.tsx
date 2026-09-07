@@ -6,6 +6,7 @@ import type { FilterStage } from '../types';
 import { cn } from '../lib/utils';
 import { BillingBadge } from './BillingBadge';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
+import { DigestPreference } from './DigestPreference';
 import {
   LayoutGrid,
   Compass,
@@ -89,6 +90,7 @@ export function Sidebar() {
       </nav>
 
       <WorkspaceSwitcher />
+      <DigestPreference />
       <BillingBadge />
     </aside>
   );
