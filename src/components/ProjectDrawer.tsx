@@ -14,10 +14,44 @@ import {
   HEALTH_HELP,
 } from '../lib/utils';
 import type { Stage, Priority, Health } from '../types';
-import { X, ExternalLink, Github, Pencil, Check, Trash2, Hand } from 'lucide-react';
+import {
+  X,
+  ExternalLink,
+  Github,
+  Pencil,
+  Check,
+  Trash2,
+  Hand,
+  MessageSquarePlus,
+} from 'lucide-react';
 import { SaveStatus } from './SaveStatus';
+import { projectMomentum, type MomentumState } from '../lib/review';
 
 const stages: Stage[] = ['Exploring', 'Building', 'Testing', 'Live', 'Paused', 'Archived'];
+
+/** How the last two review windows compare, shown beside the activity log. */
+const MOMENTUM_LABEL: Record<MomentumState, { text: string; tone: string; help: string }> = {
+  accelerating: {
+    text: 'Accelerating',
+    tone: 'text-success',
+    help: 'More work landed this window than the one before.',
+  },
+  steady: {
+    text: 'Steady',
+    tone: 'text-text-muted',
+    help: 'Moving at about the same pace as the window before.',
+  },
+  slowing: {
+    text: 'Slowing',
+    tone: 'text-warning',
+    help: 'Less work landed this window than the one before.',
+  },
+  stalled: {
+    text: 'Stalled',
+    tone: 'text-text-dim',
+    help: 'Nothing has moved in this window.',
+  },
+};
 const priorities: Priority[] = ['Now', 'Next', 'Later'];
 
 const stageDot: Record<Stage, string> = {
@@ -44,6 +78,7 @@ export function ProjectDrawer() {
     setLiveUrl,
     setRepoUrl,
     touchProject,
+    addActivity,
     deleteProject,
   } = useProjectStore();
 
@@ -54,6 +89,7 @@ export function ProjectDrawer() {
   const [liveDraft, setLiveDraft] = useState('');
   const [repoDraft, setRepoDraft] = useState('');
   const [editingLinks, setEditingLinks] = useState(false);
+  const [noteDraft, setNoteDraft] = useState('');
 
   useEffect(() => {
     if (project) {
@@ -62,6 +98,7 @@ export function ProjectDrawer() {
       setRepoDraft(project.repoUrl ?? '');
       setEditingAction(false);
       setEditingLinks(false);
+      setNoteDraft('');
     }
   }, [project?.id]);
 
@@ -80,7 +117,15 @@ export function ProjectDrawer() {
     setEditingLinks(false);
   };
 
+  const addNote = () => {
+    const message = noteDraft.trim();
+    if (!message) return;
+    addActivity(project.id, { type: 'comment', message, author: 'You' });
+    setNoteDraft('');
+  };
+
   const deadline = getDeadlineState(project.targetDate, project.stage);
+  const momentum = MOMENTUM_LABEL[projectMomentum(project).state];
 
   return (
     <AnimatePresence>
@@ -461,9 +506,46 @@ export function ProjectDrawer() {
               </div>
 
               <div>
-                <span className="text-xs font-medium text-text-dim uppercase tracking-wider">
-                  Activity
-                </span>
+                <label
+                  htmlFor="drawer-note"
+                  className="text-xs font-medium text-text-dim uppercase tracking-wider"
+                >
+                  Project note
+                </label>
+                <div className="mt-2 flex items-start gap-2">
+                  <textarea
+                    id="drawer-note"
+                    value={noteDraft}
+                    onChange={(event) => setNoteDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') addNote();
+                    }}
+                    maxLength={5000}
+                    rows={2}
+                    placeholder="Capture a decision, update, or blocker…"
+                    className="min-w-0 flex-1 resize-none rounded-lg border border-border bg-surface-elevated px-3 py-2 text-sm text-text placeholder:text-text-dim focus:outline-none focus:border-purple/50"
+                  />
+                  <button
+                    type="button"
+                    onClick={addNote}
+                    disabled={!noteDraft.trim()}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-purple px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-light disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <MessageSquarePlus size={14} aria-hidden /> Add
+                  </button>
+                </div>
+                <p className="mt-1.5 text-xs text-text-dim">Ctrl/⌘ + Enter to add</p>
+              </div>
+
+              <div>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-xs font-medium text-text-dim uppercase tracking-wider">
+                    Activity
+                  </span>
+                  <span className={cn('text-xs', momentum.tone)} title={momentum.help}>
+                    {momentum.text}
+                  </span>
+                </div>
                 <div className="mt-3 space-y-3">
                   {project.activity.length === 0 ? (
                     <p className="text-sm text-text-dim">No activity yet.</p>

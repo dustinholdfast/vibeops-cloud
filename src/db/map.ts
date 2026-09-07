@@ -21,12 +21,14 @@ export function dbProjectToDomain(row: DbProject): Project {
 }
 
 export function domainToDbInsert(
+  workspaceId: string,
   userId: string,
   p: Project
 ): NewDbProject {
   const now = new Date();
   return {
     id: p.id,
+    workspaceId,
     userId,
     name: p.name,
     nextAction: p.nextAction,

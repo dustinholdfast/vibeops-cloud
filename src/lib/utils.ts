@@ -54,14 +54,15 @@ export function formatTargetDate(dateStr: string | null): string {
  */
 export function getDeadlineState(
   targetDate: string | null,
-  stage: Stage
+  stage: Stage,
+  now: Date = new Date()
 ): DeadlineState {
   if (stage === 'Live' || stage === 'Paused' || stage === 'Archived') {
     return 'inactive';
   }
   if (!targetDate) return 'none';
 
-  const today = startOfDay(new Date());
+  const today = startOfDay(now);
   const target = startOfDay(parseLocalDate(targetDate));
   const diff = differenceInCalendarDays(target, today);
 

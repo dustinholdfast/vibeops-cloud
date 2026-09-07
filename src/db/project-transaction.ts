@@ -6,13 +6,19 @@ export type Transaction = Parameters<
 >[0];
 
 /**
- * Serialize all project mutations for one account, including imports and deletes.
- * The lock is transaction-scoped, so it is released on commit or rollback even if
- * the operation throws.
+ * Serialize all project mutations for one workspace, including imports and
+ * deletes. The lock is transaction-scoped, so it is released on commit or
+ * rollback even if the operation throws.
+ *
+ * A personal workspace id equals its owner's Clerk user id, so this locks
+ * exactly the same rows it did before workspaces existed.
  */
-export function projectTransaction<T>(userId: string, operation: (tx: Transaction) => Promise<T>) {
+export function projectTransaction<T>(
+  workspaceId: string,
+  operation: (tx: Transaction) => Promise<T>
+) {
   return requireDb().transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${userId}, 0))`);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${workspaceId}, 0))`);
     return operation(tx);
   });
 }

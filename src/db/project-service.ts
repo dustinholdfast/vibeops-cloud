@@ -4,6 +4,8 @@ import { projects, subscriptions } from './schema';
 import { dbProjectToDomain, domainToDbInsert } from './map';
 import { projectTransaction, type Transaction } from './project-transaction';
 import { resolvePlan, projectLimitFor } from '../lib/plans';
+import { can } from '../lib/workspace-roles';
+import type { Membership } from './workspace-service';
 import { isRecord } from '../lib/validation';
 import {
   ProjectError,
@@ -16,18 +18,38 @@ import type { Project } from '../types';
 
 /**
  * All project mutations run inside `projectTransaction`, which takes an advisory
- * lock keyed on the Clerk user id. Plan checks, idempotency lookups and writes
- * therefore see a stable view of one account, so concurrent requests cannot both
- * pass a limit check or both apply the same version.
+ * lock keyed on the workspace id. Plan checks, idempotency lookups and writes
+ * therefore see a stable view of one workspace, so concurrent requests cannot
+ * both pass a limit check or both apply the same version.
  */
 
-/** Project ids are globally unique; a collision across tenants must not leak the other row. */
-async function assertIdsAvailable(tx: Transaction, userId: string, ids: string[]) {
+/**
+ * Who is acting, and in which workspace. Callers build this with
+ * `requireMembership`, so reaching a service function already proves the user
+ * belongs to the workspace; what remains is what their role permits.
+ */
+export type Scope = {
+  userId: string;
+  workspace: Membership;
+};
+
+function requireWrite(scope: Scope) {
+  if (!can(scope.workspace.role, 'edit:projects')) {
+    throw new ProjectError(
+      403,
+      'FORBIDDEN',
+      'You have view-only access to this workspace.'
+    );
+  }
+}
+
+/** Project ids are globally unique; a collision across workspaces must not leak the other row. */
+async function assertIdsAvailable(tx: Transaction, workspaceId: string, ids: string[]) {
   if (!ids.length) return;
   const taken = await tx
     .select({ id: projects.id })
     .from(projects)
-    .where(and(inArray(projects.id, ids), ne(projects.userId, userId)));
+    .where(and(inArray(projects.id, ids), ne(projects.workspaceId, workspaceId)));
   if (taken.length) {
     throw new ProjectError(
       409,
@@ -37,29 +59,30 @@ async function assertIdsAvailable(tx: Transaction, userId: string, ids: string[]
   }
 }
 
-async function planLimit(tx: Transaction, userId: string) {
+/** A workspace bills on its owner's subscription, not on the member doing the work. */
+async function planLimit(tx: Transaction, workspace: Membership) {
   const [sub] = await tx
     .select()
     .from(subscriptions)
-    .where(eq(subscriptions.userId, userId));
+    .where(eq(subscriptions.userId, workspace.ownerUserId));
   return projectLimitFor(resolvePlan(sub?.plan, sub?.status));
 }
 
-export async function listProjects(userId: string) {
+export async function listProjects(scope: Scope) {
   const rows = await requireDb()
     .select()
     .from(projects)
-    .where(eq(projects.userId, userId))
+    .where(eq(projects.workspaceId, scope.workspace.workspaceId))
     .orderBy(desc(projects.lastTouched));
   return { projects: rows.map(dbProjectToDomain) };
 }
 
-export async function getProject(userId: string, projectId: string) {
+export async function getProject(scope: Scope, projectId: string) {
   const id = validateId(projectId);
   const [row] = await requireDb()
     .select()
     .from(projects)
-    .where(and(eq(projects.id, id), eq(projects.userId, userId)));
+    .where(and(eq(projects.id, id), eq(projects.workspaceId, scope.workspace.workspaceId)));
   if (!row) throw new ProjectError(404, 'NOT_FOUND', 'This project is no longer available.');
   return { project: dbProjectToDomain(row) };
 }
@@ -68,26 +91,29 @@ export async function getProject(userId: string, projectId: string) {
  * The client supplies the id, so a retried create is recognised by that id and
  * returns the original row instead of inserting a duplicate.
  */
-export async function createProject(userId: string, input: unknown) {
+export async function createProject(scope: Scope, input: unknown) {
+  requireWrite(scope);
   if (!isRecord(input)) throw new ProjectError(400, 'VALIDATION', 'Expected project details.');
   const id = validateId(input.id);
   const fields = validateFields(input);
   if (!fields.name) throw new ProjectError(400, 'VALIDATION', 'Enter a project name.');
 
-  const project = await projectTransaction(userId, async (tx) => {
+  const workspaceId = scope.workspace.workspaceId;
+
+  const project = await projectTransaction(workspaceId, async (tx) => {
     const [existing] = await tx
       .select()
       .from(projects)
-      .where(and(eq(projects.id, id), eq(projects.userId, userId)));
+      .where(and(eq(projects.id, id), eq(projects.workspaceId, workspaceId)));
     if (existing) return dbProjectToDomain(existing);
 
-    await assertIdsAvailable(tx, userId, [id]);
+    await assertIdsAvailable(tx, workspaceId, [id]);
 
-    const limit = await planLimit(tx, userId);
+    const limit = await planLimit(tx, scope.workspace);
     const owned = await tx
       .select({ id: projects.id })
       .from(projects)
-      .where(eq(projects.userId, userId));
+      .where(eq(projects.workspaceId, workspaceId));
     if (limit !== null && owned.length >= limit) {
       throw new ProjectError(
         402,
@@ -119,7 +145,10 @@ export async function createProject(userId: string, input: unknown) {
         },
       ],
     };
-    const [row] = await tx.insert(projects).values(domainToDbInsert(userId, domain)).returning();
+    const [row] = await tx
+      .insert(projects)
+      .values(domainToDbInsert(workspaceId, scope.userId, domain))
+      .returning();
     return dbProjectToDomain(row);
   });
 
@@ -131,15 +160,20 @@ export async function createProject(userId: string, input: unknown) {
  * it believes are current; any drift means someone else wrote in between and the
  * import is refused before anything is deleted.
  */
-export async function importProjects(userId: string, input: unknown) {
+export async function importProjects(scope: Scope, input: unknown) {
+  requireWrite(scope);
   const list = validateImport(input);
   if (!isRecord(input) || !isRecord(input.versions)) {
     throw new ProjectError(400, 'VALIDATION', 'Reload your workspace before importing.');
   }
   const versions = input.versions;
+  const workspaceId = scope.workspace.workspaceId;
 
-  const result = await projectTransaction(userId, async (tx) => {
-    const existing = await tx.select().from(projects).where(eq(projects.userId, userId));
+  const result = await projectTransaction(workspaceId, async (tx) => {
+    const existing = await tx
+      .select()
+      .from(projects)
+      .where(eq(projects.workspaceId, workspaceId));
     const drifted =
       existing.length !== Object.keys(versions).length ||
       existing.some((row) => versions[row.id] !== row.version);
@@ -151,9 +185,13 @@ export async function importProjects(userId: string, input: unknown) {
       );
     }
 
-    await assertIdsAvailable(tx, userId, list.map((p) => p.id));
+    await assertIdsAvailable(
+      tx,
+      workspaceId,
+      list.map((p) => p.id)
+    );
 
-    const limit = await planLimit(tx, userId);
+    const limit = await planLimit(tx, scope.workspace);
     if (limit !== null && list.length > limit) {
       throw new ProjectError(
         402,
@@ -164,11 +202,11 @@ export async function importProjects(userId: string, input: unknown) {
 
     // Reusing an id keeps its version climbing so other tabs still detect drift.
     const previous = new Map(existing.map((row) => [row.id, row.version]));
-    await tx.delete(projects).where(eq(projects.userId, userId));
+    await tx.delete(projects).where(eq(projects.workspaceId, workspaceId));
     if (list.length) {
       await tx.insert(projects).values(
         list.map((p) => ({
-          ...domainToDbInsert(userId, p),
+          ...domainToDbInsert(workspaceId, scope.userId, p),
           version: (previous.get(p.id) ?? 0) + 1,
         }))
       );
@@ -177,7 +215,7 @@ export async function importProjects(userId: string, input: unknown) {
     const rows = await tx
       .select()
       .from(projects)
-      .where(eq(projects.userId, userId))
+      .where(eq(projects.workspaceId, workspaceId))
       .orderBy(desc(projects.lastTouched));
     return rows.map(dbProjectToDomain);
   });
@@ -190,7 +228,8 @@ export async function importProjects(userId: string, input: unknown) {
  * mutation id means the previous attempt already landed, so the stored row is
  * returned unchanged rather than applied twice.
  */
-export async function updateProject(userId: string, projectId: string, input: unknown) {
+export async function updateProject(scope: Scope, projectId: string, input: unknown) {
+  requireWrite(scope);
   const id = validateId(projectId);
   if (!isRecord(input) || !Number.isInteger(input.version) || (input.version as number) < 1) {
     throw new ProjectError(400, 'VALIDATION', 'Reload the project before saving.');
@@ -198,12 +237,13 @@ export async function updateProject(userId: string, projectId: string, input: un
   const version = input.version as number;
   const mutationId = validateId(input.mutationId);
   const fields = validateFields(input);
+  const workspaceId = scope.workspace.workspaceId;
 
-  const project = await projectTransaction(userId, async (tx) => {
+  const project = await projectTransaction(workspaceId, async (tx) => {
     const [existing] = await tx
       .select()
       .from(projects)
-      .where(and(eq(projects.id, id), eq(projects.userId, userId)));
+      .where(and(eq(projects.id, id), eq(projects.workspaceId, workspaceId)));
     if (!existing) throw new ProjectError(404, 'NOT_FOUND', 'This project is no longer available.');
     if (existing.lastMutationId === mutationId) return dbProjectToDomain(existing);
     if (existing.version !== version) {
@@ -224,7 +264,7 @@ export async function updateProject(userId: string, projectId: string, input: un
         version: existing.version + 1,
         lastMutationId: mutationId,
       })
-      .where(and(eq(projects.id, id), eq(projects.userId, userId)))
+      .where(and(eq(projects.id, id), eq(projects.workspaceId, workspaceId)))
       .returning();
     return dbProjectToDomain(row);
   });
@@ -233,18 +273,20 @@ export async function updateProject(userId: string, projectId: string, input: un
 }
 
 /** Idempotent: deleting an already-deleted project succeeds so a retry cannot fail. */
-export async function deleteProject(userId: string, projectId: string, input: unknown) {
+export async function deleteProject(scope: Scope, projectId: string, input: unknown) {
+  requireWrite(scope);
   const id = validateId(projectId);
   if (!isRecord(input) || !Number.isInteger(input.version) || (input.version as number) < 1) {
     throw new ProjectError(400, 'VALIDATION', 'Reload the project before deleting.');
   }
   const version = input.version as number;
+  const workspaceId = scope.workspace.workspaceId;
 
-  await projectTransaction(userId, async (tx) => {
+  await projectTransaction(workspaceId, async (tx) => {
     const [existing] = await tx
       .select()
       .from(projects)
-      .where(and(eq(projects.id, id), eq(projects.userId, userId)));
+      .where(and(eq(projects.id, id), eq(projects.workspaceId, workspaceId)));
     if (!existing) return;
     if (existing.version !== version) {
       throw new ProjectError(
@@ -253,7 +295,7 @@ export async function deleteProject(userId: string, projectId: string, input: un
         'This project changed elsewhere. Reload it before deleting.'
       );
     }
-    await tx.delete(projects).where(and(eq(projects.id, id), eq(projects.userId, userId)));
+    await tx.delete(projects).where(and(eq(projects.id, id), eq(projects.workspaceId, workspaceId)));
   });
 
   return { ok: true };

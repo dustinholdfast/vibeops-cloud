@@ -24,6 +24,8 @@ if (!url) {
 process.env.DATABASE_URL = url;
 
 type Service = typeof import('./project-service');
+type Scope = import('./project-service').Scope;
+type WorkspaceRole = import('../lib/workspace-roles').WorkspaceRole;
 type ProjectErrorClass = typeof import('../lib/project-validation').ProjectError;
 
 let service: Service;
@@ -32,6 +34,38 @@ let sql: postgres.Sql;
 
 const USER = 'user_alice';
 const OTHER = 'user_bob';
+const TEAM = 'ws_team';
+
+/**
+ * A personal workspace has the same id as its owner, so this is the scope every
+ * pre-workspaces test implicitly ran under.
+ */
+function scope(userId: string, role: WorkspaceRole = 'owner'): Scope {
+  return {
+    userId,
+    workspace: {
+      workspaceId: userId,
+      name: 'Personal',
+      personal: true,
+      ownerUserId: userId,
+      role,
+    },
+  };
+}
+
+/** A shared workspace owned by `ownerUserId`, acted on by `userId`. */
+function teamScope(userId: string, role: WorkspaceRole, ownerUserId = USER): Scope {
+  return {
+    userId,
+    workspace: {
+      workspaceId: TEAM,
+      name: 'Team',
+      personal: false,
+      ownerUserId,
+      role,
+    },
+  };
+}
 
 /** The projects table as it existed before the reliable-saves work. */
 const LEGACY_SCHEMA = `
@@ -123,7 +157,7 @@ async function setPlan(userId: string, plan: 'free' | 'pro') {
 
 async function seed(userId: string, count: number) {
   for (let i = 0; i < count; i += 1) {
-    await service.createProject(userId, projectInput(`${userId}-seed-${i}`));
+    await service.createProject(scope(userId), projectInput(`${userId}-seed-${i}`));
   }
 }
 
@@ -143,9 +177,10 @@ async function holdAccountLock(userId: string) {
   };
 }
 
-const countFor = async (userId: string) => {
+/** Counts by workspace, which is what scoping is actually keyed on now. */
+const countFor = async (workspaceId: string) => {
   const rows = await sql<{ n: number }[]>`
-    SELECT count(*)::int AS n FROM projects WHERE user_id = ${userId}
+    SELECT count(*)::int AS n FROM projects WHERE workspace_id = ${workspaceId}
   `;
   return rows[0].n;
 };
@@ -154,6 +189,7 @@ before(async () => {
   sql = postgres(url, { prepare: false, max: 8 });
   await sql.unsafe(LEGACY_SCHEMA);
   await sql.unsafe(readFileSync('scripts/reliable-saves.sql', 'utf8'));
+  await sql.unsafe(readFileSync('scripts/team-workspaces.sql', 'utf8'));
   service = await import('./project-service');
   ProjectError = (await import('../lib/project-validation')).ProjectError;
 });
@@ -164,7 +200,7 @@ after(async () => {
 });
 
 beforeEach(async () => {
-  await sql`TRUNCATE projects, subscriptions`;
+  await sql`TRUNCATE projects, subscriptions, workspaces, workspace_members, workspace_invites`;
 });
 
 describe('migration', () => {
@@ -183,10 +219,10 @@ describe('migration', () => {
 
   it('starts pre-existing rows at version 1', async () => {
     await sql`
-      INSERT INTO projects (id, user_id, name, last_touched, created_at, updated_at)
-      VALUES ('legacy1', ${USER}, 'Legacy', now(), now(), now())
+      INSERT INTO projects (id, workspace_id, user_id, name, last_touched, created_at, updated_at)
+      VALUES ('legacy1', ${USER}, ${USER}, 'Legacy', now(), now(), now())
     `;
-    const { project } = await service.getProject(USER, 'legacy1');
+    const { project } = await service.getProject(scope(USER), 'legacy1');
     assert.equal(project.version, 1);
   });
 });
@@ -194,19 +230,19 @@ describe('migration', () => {
 describe('createProject', () => {
   it('allows the fifth Free project and refuses the sixth without inserting', async () => {
     await seed(USER, 4);
-    const { project } = await service.createProject(USER, projectInput('fifth'));
+    const { project } = await service.createProject(scope(USER), projectInput('fifth'));
     assert.equal(project.name, 'Project fifth');
     assert.equal(project.version, 1);
     assert.equal(await countFor(USER), 5);
 
-    await fails(service.createProject(USER, projectInput('sixth')), 402, 'PLAN_LIMIT');
+    await fails(service.createProject(scope(USER), projectInput('sixth')), 402, 'PLAN_LIMIT');
     assert.equal(await countFor(USER), 5);
   });
 
   it('lets a Pro account pass the Free limit', async () => {
     await setPlan(USER, 'pro');
     await seed(USER, 5);
-    await service.createProject(USER, projectInput('sixth'));
+    await service.createProject(scope(USER), projectInput('sixth'));
     assert.equal(await countFor(USER), 6);
   });
 
@@ -216,14 +252,14 @@ describe('createProject', () => {
     const release = await holdAccountLock(USER);
     let settled = false;
     const blocked = service
-      .createProject(USER, projectInput('blocked'))
+      .createProject(scope(USER), projectInput('blocked'))
       .finally(() => {
         settled = true;
       });
     try {
       await delay(500);
       assert.equal(settled, false, 'create must wait for the account lock');
-      await service.createProject(OTHER, projectInput('unblocked'));
+      await service.createProject(scope(OTHER), projectInput('unblocked'));
       assert.equal(await countFor(OTHER), 1, 'a different account must not be blocked');
     } finally {
       await release();
@@ -238,7 +274,7 @@ describe('createProject', () => {
     // genuinely contend for the single remaining slot.
     const release = await holdAccountLock(USER);
     const attempts = Array.from({ length: 6 }, (_, i) =>
-      service.createProject(USER, projectInput(`race-${i}`))
+      service.createProject(scope(USER), projectInput(`race-${i}`))
     );
     const settled: Promise<PromiseSettledResult<unknown>[]> = Promise.allSettled(attempts);
     await delay(300);
@@ -258,72 +294,72 @@ describe('createProject', () => {
   });
 
   it('treats a repeated create id as the original row', async () => {
-    const first = await service.createProject(USER, projectInput('stable'));
-    const retry = await service.createProject(USER, projectInput('stable', { name: 'Renamed' }));
+    const first = await service.createProject(scope(USER), projectInput('stable'));
+    const retry = await service.createProject(scope(USER), projectInput('stable', { name: 'Renamed' }));
     assert.equal(retry.project.id, first.project.id);
     assert.equal(retry.project.name, first.project.name, 'the retry must not overwrite');
     assert.equal(await countFor(USER), 1);
   });
 
   it('reports a conflict rather than a server error when another tenant owns the id', async () => {
-    await service.createProject(OTHER, projectInput('shared-id'));
-    await fails(service.createProject(USER, projectInput('shared-id')), 409, 'ID_TAKEN');
+    await service.createProject(scope(OTHER), projectInput('shared-id'));
+    await fails(service.createProject(scope(USER), projectInput('shared-id')), 409, 'ID_TAKEN');
     assert.equal(await countFor(USER), 0);
     assert.equal(await countFor(OTHER), 1);
   });
 
   it('rejects invalid input before touching the database', async () => {
-    await fails(service.createProject(USER, projectInput('bad', { stage: 'Nope' })), 400, 'VALIDATION');
-    await fails(service.createProject(USER, { name: 'No id' }), 400, 'VALIDATION');
-    await fails(service.createProject(USER, projectInput('nameless', { name: '  ' })), 400, 'VALIDATION');
+    await fails(service.createProject(scope(USER), projectInput('bad', { stage: 'Nope' })), 400, 'VALIDATION');
+    await fails(service.createProject(scope(USER), { name: 'No id' }), 400, 'VALIDATION');
+    await fails(service.createProject(scope(USER), projectInput('nameless', { name: '  ' })), 400, 'VALIDATION');
     assert.equal(await countFor(USER), 0);
   });
 });
 
 describe('updateProject', () => {
   it('applies a repeated mutation id only once', async () => {
-    const { project } = await service.createProject(USER, projectInput('p1'));
+    const { project } = await service.createProject(scope(USER), projectInput('p1'));
     const payload = { version: project.version, mutationId: 'mut-1', name: 'First save' };
-    const first = await service.updateProject(USER, 'p1', payload);
+    const first = await service.updateProject(scope(USER), 'p1', payload);
     assert.equal(first.project.version, 2);
     assert.equal(first.project.name, 'First save');
 
-    const retry = await service.updateProject(USER, 'p1', payload);
+    const retry = await service.updateProject(scope(USER), 'p1', payload);
     assert.equal(retry.project.version, 2, 'a retried mutation must not bump the version');
     assert.equal(retry.project.name, 'First save');
   });
 
   it('lets one of two edits from the same version win and conflicts the other', async () => {
-    const { project } = await service.createProject(USER, projectInput('p1'));
+    const { project } = await service.createProject(scope(USER), projectInput('p1'));
     const version = project.version;
-    await service.updateProject(USER, 'p1', { version, mutationId: 'mut-a', name: 'A wins' });
+    await service.updateProject(scope(USER), 'p1', { version, mutationId: 'mut-a', name: 'A wins' });
     await fails(
-      service.updateProject(USER, 'p1', { version, mutationId: 'mut-b', name: 'B loses' }),
+      service.updateProject(scope(USER), 'p1', { version, mutationId: 'mut-b', name: 'B loses' }),
       409,
       'CONFLICT'
     );
-    const { project: after } = await service.getProject(USER, 'p1');
+    const { project: after } = await service.getProject(scope(USER), 'p1');
     assert.equal(after.name, 'A wins');
     assert.equal(after.version, 2);
   });
 
   it('rejects an update with a missing or malformed version', async () => {
-    await service.createProject(USER, projectInput('p1'));
-    await fails(service.updateProject(USER, 'p1', { mutationId: 'm', name: 'x' }), 400, 'VALIDATION');
+    await service.createProject(scope(USER), projectInput('p1'));
+    await fails(service.updateProject(scope(USER), 'p1', { mutationId: 'm', name: 'x' }), 400, 'VALIDATION');
     await fails(
-      service.updateProject(USER, 'p1', { version: 0, mutationId: 'm', name: 'x' }),
+      service.updateProject(scope(USER), 'p1', { version: 0, mutationId: 'm', name: 'x' }),
       400,
       'VALIDATION'
     );
-    await fails(service.updateProject(USER, 'p1', { version: 1, name: 'x' }), 400, 'VALIDATION');
+    await fails(service.updateProject(scope(USER), 'p1', { version: 1, name: 'x' }), 400, 'VALIDATION');
   });
 
   it('clears a URL when null is sent and keeps untouched fields', async () => {
     const { project } = await service.createProject(
-      USER,
+      scope(USER),
       projectInput('p1', { liveUrl: 'https://example.com', nextAction: 'Keep me' })
     );
-    const { project: cleared } = await service.updateProject(USER, 'p1', {
+    const { project: cleared } = await service.updateProject(scope(USER), 'p1', {
       version: project.version,
       mutationId: 'm1',
       liveUrl: null,
@@ -334,7 +370,7 @@ describe('updateProject', () => {
 
   it('returns 404 for a project that does not exist', async () => {
     await fails(
-      service.updateProject(USER, 'ghost', { version: 1, mutationId: 'm', name: 'x' }),
+      service.updateProject(scope(USER), 'ghost', { version: 1, mutationId: 'm', name: 'x' }),
       404,
       'NOT_FOUND'
     );
@@ -343,20 +379,20 @@ describe('updateProject', () => {
 
 describe('deleteProject', () => {
   it('conflicts on a stale version and succeeds when repeated after deleting', async () => {
-    const { project } = await service.createProject(USER, projectInput('p1'));
-    await service.updateProject(USER, 'p1', {
+    const { project } = await service.createProject(scope(USER), projectInput('p1'));
+    await service.updateProject(scope(USER), 'p1', {
       version: project.version,
       mutationId: 'm1',
       name: 'Moved on',
     });
 
-    await fails(service.deleteProject(USER, 'p1', { version: project.version }), 409, 'CONFLICT');
+    await fails(service.deleteProject(scope(USER), 'p1', { version: project.version }), 409, 'CONFLICT');
     assert.equal(await countFor(USER), 1);
 
-    await service.deleteProject(USER, 'p1', { version: 2 });
+    await service.deleteProject(scope(USER), 'p1', { version: 2 });
     assert.equal(await countFor(USER), 0);
     // A retry of a delete whose response was lost must not fail.
-    await service.deleteProject(USER, 'p1', { version: 2 });
+    await service.deleteProject(scope(USER), 'p1', { version: 2 });
     assert.equal(await countFor(USER), 0);
   });
 });
@@ -371,7 +407,7 @@ describe('importProjects', () => {
 
   it('imports exactly the Free limit', async () => {
     const projects = Array.from({ length: 5 }, (_, i) => exportable(`imp${i}`));
-    const result = await service.importProjects(USER, { projects, versions: {} });
+    const result = await service.importProjects(scope(USER), { projects, versions: {} });
     assert.equal(result.projects.length, 5);
     assert.equal(await countFor(USER), 5);
     assert.ok(result.projects.every((p) => p.version === 1));
@@ -382,7 +418,7 @@ describe('importProjects', () => {
     const before = await versionsOf(USER);
     const projects = Array.from({ length: 6 }, (_, i) => exportable(`imp${i}`));
     await fails(
-      service.importProjects(USER, { projects, versions: before }),
+      service.importProjects(scope(USER), { projects, versions: before }),
       402,
       'PLAN_LIMIT'
     );
@@ -393,7 +429,7 @@ describe('importProjects', () => {
     await seed(USER, 2);
     const before = await versionsOf(USER);
     const projects = [exportable('ok1'), exportable('bad1', { progress: 250 })];
-    await fails(service.importProjects(USER, { projects, versions: before }), 400, 'VALIDATION');
+    await fails(service.importProjects(scope(USER), { projects, versions: before }), 400, 'VALIDATION');
     assert.deepEqual(await versionsOf(USER), before);
   });
 
@@ -402,7 +438,7 @@ describe('importProjects', () => {
     const before = await versionsOf(USER);
     const stale = Object.fromEntries(Object.entries(before).map(([id, v]) => [id, v + 5]));
     await fails(
-      service.importProjects(USER, { projects: [exportable('new1')], versions: stale }),
+      service.importProjects(scope(USER), { projects: [exportable('new1')], versions: stale }),
       409,
       'CONFLICT'
     );
@@ -410,7 +446,7 @@ describe('importProjects', () => {
 
     // A snapshot missing a project the server has is drift too.
     await fails(
-      service.importProjects(USER, { projects: [exportable('new1')], versions: {} }),
+      service.importProjects(scope(USER), { projects: [exportable('new1')], versions: {} }),
       409,
       'CONFLICT'
     );
@@ -423,7 +459,7 @@ describe('importProjects', () => {
     await sql`ALTER TABLE projects ADD CONSTRAINT test_reject_boom CHECK (name <> 'BOOM')`;
     try {
       await assert.rejects(
-        service.importProjects(USER, {
+        service.importProjects(scope(USER), {
           projects: [exportable('ok1'), exportable('boom1', { name: 'BOOM' })],
           versions: before,
         })
@@ -436,15 +472,15 @@ describe('importProjects', () => {
   });
 
   it('bumps the version of reused ids so other tabs still detect the change', async () => {
-    const { project } = await service.createProject(USER, projectInput('keep'));
+    const { project } = await service.createProject(scope(USER), projectInput('keep'));
     assert.equal(project.version, 1);
-    const result = await service.importProjects(USER, {
+    const result = await service.importProjects(scope(USER), {
       projects: [exportable('keep', { name: 'Imported over' })],
       versions: { keep: 1 },
     });
     assert.equal(result.projects[0].version, 2);
     await fails(
-      service.updateProject(USER, 'keep', { version: 1, mutationId: 'm', name: 'stale write' }),
+      service.updateProject(scope(USER), 'keep', { version: 1, mutationId: 'm', name: 'stale write' }),
       409,
       'CONFLICT'
     );
@@ -453,7 +489,7 @@ describe('importProjects', () => {
   it('clears the workspace when given an empty list', async () => {
     await seed(USER, 3);
     const versions = await versionsOf(USER);
-    const result = await service.importProjects(USER, { projects: [], versions });
+    const result = await service.importProjects(scope(USER), { projects: [], versions });
     assert.equal(result.projects.length, 0);
     assert.equal(await countFor(USER), 0);
   });
@@ -471,7 +507,7 @@ describe('importProjects', () => {
       createdAt: now,
       lastTouched: now,
     };
-    const result = await service.importProjects(USER, { projects: [legacy], versions: {} });
+    const result = await service.importProjects(scope(USER), { projects: [legacy], versions: {} });
     assert.equal(result.projects.length, 1);
     assert.equal(result.projects[0].version, 1, 'imports get a valid server version');
     assert.equal(result.projects[0].progress, 0);
@@ -485,7 +521,7 @@ describe('importProjects', () => {
       message: `entry ${i}`,
       timestamp: new Date().toISOString(),
     }));
-    const result = await service.importProjects(USER, {
+    const result = await service.importProjects(scope(USER), {
       projects: [exportable('long1', { activity })],
       versions: {},
     });
@@ -494,11 +530,11 @@ describe('importProjects', () => {
   });
 
   it('refuses an import that would claim another tenant’s project id', async () => {
-    await service.createProject(OTHER, projectInput('shared-id'));
+    await service.createProject(scope(OTHER), projectInput('shared-id'));
     await seed(USER, 1);
     const before = await versionsOf(USER);
     await fails(
-      service.importProjects(USER, {
+      service.importProjects(scope(USER), {
         projects: [exportable('shared-id')],
         versions: before,
       }),
@@ -511,7 +547,7 @@ describe('importProjects', () => {
 
   it('rejects duplicate ids inside one import', async () => {
     await fails(
-      service.importProjects(USER, {
+      service.importProjects(scope(USER), {
         projects: [exportable('dup'), exportable('dup')],
         versions: {},
       }),
@@ -522,20 +558,20 @@ describe('importProjects', () => {
   });
 
   it('requires a versions snapshot', async () => {
-    await fails(service.importProjects(USER, { projects: [] }), 400, 'VALIDATION');
+    await fails(service.importProjects(scope(USER), { projects: [] }), 400, 'VALIDATION');
   });
 });
 
 describe('tenant isolation', () => {
   it('hides, refuses and preserves another user’s project', async () => {
-    const { project } = await service.createProject(OTHER, projectInput('bobs'));
+    const { project } = await service.createProject(scope(OTHER), projectInput('bobs'));
 
-    const list = await service.listProjects(USER);
+    const list = await service.listProjects(scope(USER));
     assert.equal(list.projects.length, 0, 'another tenant’s project must not be listed');
 
-    await fails(service.getProject(USER, 'bobs'), 404, 'NOT_FOUND');
+    await fails(service.getProject(scope(USER), 'bobs'), 404, 'NOT_FOUND');
     await fails(
-      service.updateProject(USER, 'bobs', {
+      service.updateProject(scope(USER), 'bobs', {
         version: project.version,
         mutationId: 'm',
         name: 'Hijacked',
@@ -545,19 +581,122 @@ describe('tenant isolation', () => {
     );
 
     // A delete of something you cannot see is a no-op, never a cross-tenant delete.
-    await service.deleteProject(USER, 'bobs', { version: project.version });
-    const { project: untouched } = await service.getProject(OTHER, 'bobs');
+    await service.deleteProject(scope(USER), 'bobs', { version: project.version });
+    const { project: untouched } = await service.getProject(scope(OTHER), 'bobs');
     assert.equal(untouched.name, 'Project bobs');
     assert.equal(untouched.version, 1);
 
     // Importing an empty workspace must not reach across tenants either.
-    await service.importProjects(USER, { projects: [], versions: {} });
+    await service.importProjects(scope(USER), { projects: [], versions: {} });
     assert.equal(await countFor(OTHER), 1);
   });
 
   it('scopes the plan limit to the acting user', async () => {
     await seed(OTHER, 5);
-    await service.createProject(USER, projectInput('mine'));
+    await service.createProject(scope(USER), projectInput('mine'));
     assert.equal(await countFor(USER), 1);
+  });
+});
+
+describe('workspace scoping', () => {
+  it('applies the team-workspaces migration and is safe to rerun', async () => {
+    await sql.unsafe(readFileSync('scripts/team-workspaces.sql', 'utf8'));
+
+    const [column] = await sql<{ is_nullable: string }[]>`
+      SELECT is_nullable FROM information_schema.columns
+      WHERE table_name = 'projects' AND column_name = 'workspace_id'
+    `;
+    assert.equal(column.is_nullable, 'NO');
+
+    const tables = await sql<{ table_name: string }[]>`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_name IN ('workspaces', 'workspace_members', 'workspace_invites')
+      ORDER BY table_name
+    `;
+    assert.deepEqual(
+      tables.map((t) => t.table_name),
+      ['workspace_invites', 'workspace_members', 'workspaces']
+    );
+  });
+
+  it('backfills existing rows into their owner’s personal workspace', async () => {
+    await sql`
+      INSERT INTO projects (id, workspace_id, user_id, name, last_touched, created_at, updated_at)
+      VALUES ('legacy2', ${USER}, ${USER}, 'Legacy', now(), now(), now())
+    `;
+    // Re-running the migration must leave an already-scoped row alone.
+    await sql.unsafe(readFileSync('scripts/team-workspaces.sql', 'utf8'));
+
+    const [row] = await sql<{ workspace_id: string }[]>`
+      SELECT workspace_id FROM projects WHERE id = 'legacy2'
+    `;
+    assert.equal(row.workspace_id, USER);
+  });
+
+  it('keeps a shared workspace separate from either member’s personal one', async () => {
+    await service.createProject(teamScope(USER, 'owner'), projectInput('team-1'));
+    await service.createProject(scope(USER), projectInput('mine'));
+
+    assert.equal(await countFor(TEAM), 1);
+    assert.equal(await countFor(USER), 1);
+
+    // A member of the team sees the team project but not Alice's personal one.
+    const teamList = await service.listProjects(teamScope(OTHER, 'member'));
+    assert.deepEqual(teamList.projects.map((p) => p.id), ['team-1']);
+
+    const personalList = await service.listProjects(scope(OTHER));
+    assert.equal(personalList.projects.length, 0);
+  });
+
+  it('lets a member write and refuses a viewer every mutation', async () => {
+    const { project } = await service.createProject(
+      teamScope(OTHER, 'member'),
+      projectInput('team-1')
+    );
+    assert.equal(project.id, 'team-1');
+
+    const viewer = teamScope('user_carol', 'viewer');
+    await fails(service.createProject(viewer, projectInput('nope')), 403, 'FORBIDDEN');
+    await fails(
+      service.updateProject(viewer, 'team-1', { version: 1, mutationId: 'm', name: 'x' }),
+      403,
+      'FORBIDDEN'
+    );
+    await fails(service.deleteProject(viewer, 'team-1', { version: 1 }), 403, 'FORBIDDEN');
+    await fails(
+      service.importProjects(viewer, { projects: [], versions: {} }),
+      403,
+      'FORBIDDEN'
+    );
+
+    // Reading is still allowed, and nothing was written.
+    const list = await service.listProjects(viewer);
+    assert.deepEqual(list.projects.map((p) => p.id), ['team-1']);
+    assert.equal(await countFor(TEAM), 1);
+  });
+
+  it('bills a workspace on its owner’s plan, not the acting member’s', async () => {
+    // Bob is free; Alice owns the workspace and is on Pro.
+    await setPlan(USER, 'pro');
+    await setPlan(OTHER, 'free');
+
+    for (let i = 0; i < 6; i += 1) {
+      await service.createProject(teamScope(OTHER, 'member'), projectInput(`team-${i}`));
+    }
+    assert.equal(await countFor(TEAM), 6, 'the owner’s Pro plan should lift the limit');
+
+    // And the reverse: a free owner caps a Pro member.
+    await setPlan('user_dave', 'free');
+    const davesTeam = { ...teamScope(USER, 'member', 'user_dave') };
+    davesTeam.workspace = { ...davesTeam.workspace, workspaceId: 'ws_daves' };
+    for (let i = 0; i < 5; i += 1) {
+      await service.createProject(davesTeam, projectInput(`dave-${i}`));
+    }
+    await fails(service.createProject(davesTeam, projectInput('dave-6')), 402, 'PLAN_LIMIT');
+  });
+
+  it('refuses a project id already taken by another workspace', async () => {
+    await service.createProject(teamScope(USER, 'owner'), projectInput('shared'));
+    await fails(service.createProject(scope(OTHER), projectInput('shared')), 409, 'ID_TAKEN');
   });
 });

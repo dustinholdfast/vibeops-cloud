@@ -1,11 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { requireDb } from '@/src/db';
-import { subscriptions, projects } from '@/src/db/schema';
-import {
-  resolvePlan,
-  canCreateProject,
-  type PlanId,
-} from '@/src/lib/plans';
+import { subscriptions } from '@/src/db/schema';
+import { resolvePlan, type PlanId } from '@/src/lib/plans';
 
 export async function getSubscriptionRow(userId: string) {
   const db = requireDb();
@@ -55,23 +51,4 @@ export async function ensureSubscriptionRow(userId: string) {
     .onConflictDoNothing()
     .returning();
   return row ?? (await getSubscriptionRow(userId))!;
-}
-
-export async function assertCanCreateProject(userId: string) {
-  const { plan } = await getUserPlan(userId);
-  const db = requireDb();
-  const rows = await db
-    .select({ id: projects.id })
-    .from(projects)
-    .where(eq(projects.userId, userId));
-  const check = canCreateProject(plan, rows.length);
-  if (!check.ok) {
-    return {
-      allowed: false as const,
-      plan,
-      limit: check.limit,
-      count: rows.length,
-    };
-  }
-  return { allowed: true as const, plan, count: rows.length };
 }

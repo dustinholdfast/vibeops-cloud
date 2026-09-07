@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import type {
+  Workspace,
   Project,
   Stage,
   Priority,
@@ -20,6 +21,9 @@ import {
   apiDeleteProject,
   apiImportProjects,
   apiGetProject,
+  apiListWorkspaces,
+  apiCreateWorkspace,
+  setActiveWorkspace,
 } from '../lib/api';
 import { isRecord } from '../lib/validation';
 import {
@@ -57,6 +61,11 @@ type Creation = { id: string; name: string };
 
 interface ProjectState {
   userId: string | null;
+  /** The workspace currently being shown. Null means the personal one. */
+  workspaceId: string | null;
+  workspaces: Workspace[];
+  workspaceError: string | null;
+  switchingWorkspace: boolean;
   projects: Project[];
   drafts: Record<string, Draft>;
   creation: Creation | null;
@@ -80,6 +89,9 @@ interface ProjectState {
   openDrawer: (id: string) => void;
   closeDrawer: () => void;
   loadProjects: (userId?: string) => Promise<void>;
+  loadWorkspaces: () => Promise<void>;
+  switchWorkspace: (workspaceId: string) => Promise<void>;
+  createWorkspace: (name: string) => Promise<Workspace | null>;
   resetSession: () => void;
   addProject: (data: { name: string }) => Promise<boolean>;
   cancelCreation: () => void;
@@ -197,10 +209,18 @@ function parseCreation(value: unknown): Creation | null {
   }
 }
 
-function readRecovered(account: string): { drafts: Record<string, Draft>; creation: Creation | null } {
+/** Recovery is per account *and* per workspace, so switching cannot mix drafts. */
+export function draftKey(account: string, workspaceId: string | null): string {
+  return DRAFT_PREFIX + account + ':' + (workspaceId ?? account);
+}
+
+function readRecovered(
+  account: string,
+  workspaceId: string | null
+): { drafts: Record<string, Draft>; creation: Creation | null } {
   const empty = { drafts: {}, creation: null };
   if (typeof sessionStorage === 'undefined') return empty;
-  const raw = sessionStorage.getItem(DRAFT_PREFIX + account);
+  const raw = sessionStorage.getItem(draftKey(account, workspaceId));
   if (!raw) return empty;
   const stored: unknown = JSON.parse(raw);
   if (!isRecord(stored)) return empty;
@@ -215,11 +235,12 @@ function readRecovered(account: string): { drafts: Record<string, Draft>; creati
 }
 
 function persist() {
-  const { userId, drafts, creation } = useProjectStore.getState();
+  const { userId, workspaceId, drafts, creation } = useProjectStore.getState();
   if (!userId || typeof sessionStorage === 'undefined') return;
+  const key = draftKey(userId, workspaceId);
   try {
-    if (!Object.keys(drafts).length && !creation) sessionStorage.removeItem(DRAFT_PREFIX + userId);
-    else sessionStorage.setItem(DRAFT_PREFIX + userId, JSON.stringify({ drafts, creation }));
+    if (!Object.keys(drafts).length && !creation) sessionStorage.removeItem(key);
+    else sessionStorage.setItem(key, JSON.stringify({ drafts, creation }));
   } catch {
     useProjectStore.setState({
       operationError:
@@ -352,6 +373,10 @@ function schedule(id: string) {
 
 export const useProjectStore = create<ProjectState>()((set, get) => ({
   userId: null,
+  workspaceId: null,
+  workspaces: [],
+  workspaceError: null,
+  switchingWorkspace: false,
   projects: [],
   drafts: {},
   creation: null,
@@ -383,6 +408,10 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     timers.clear();
     set({
       userId: null,
+      workspaceId: null,
+      workspaces: [],
+      workspaceError: null,
+      switchingWorkspace: false,
       projects: [],
       drafts: {},
       creation: null,
@@ -401,10 +430,88 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     });
   },
 
+  loadWorkspaces: async () => {
+    const epoch = session;
+    try {
+      const workspaces = await apiListWorkspaces();
+      if (epoch !== session) return;
+      const current = get().workspaceId;
+      // Fall back to the personal workspace if the active one is gone.
+      const active = workspaces.some((w) => w.workspaceId === current) ? current : null;
+      set({ workspaces, workspaceId: active, workspaceError: null });
+      setActiveWorkspace(active);
+    } catch (error) {
+      if (epoch === session) set({ workspaceError: message(error) });
+    }
+  },
+
+  /**
+   * Switching replaces every project on screen, so it must not race work the
+   * server has not confirmed — the same rule import and clear follow.
+   */
+  switchWorkspace: async (workspaceId) => {
+    const state = get();
+    if (state.workspaceId === workspaceId || state.switchingWorkspace) return;
+    if (
+      state.operationBusy ||
+      state.creating ||
+      state.creation ||
+      Object.keys(state.drafts).length
+    ) {
+      set({
+        operationError: 'Save or discard pending changes before switching workspace.',
+        operationCode: 'CLIENT',
+      });
+      return;
+    }
+    if (!state.workspaces.some((w) => w.workspaceId === workspaceId)) {
+      set({ workspaceError: 'That workspace is no longer available.' });
+      return;
+    }
+
+    setActiveWorkspace(workspaceId);
+    set({
+      workspaceId,
+      switchingWorkspace: true,
+      projects: [],
+      selectedId: null,
+      isDrawerOpen: false,
+      search: '',
+      filter: 'All',
+      healthFilter: 'All',
+      deadlineFilter: 'All',
+      loadStatus: 'idle',
+      operationError: null,
+      operationCode: null,
+      workspaceError: null,
+    });
+    try {
+      await get().loadProjects();
+    } finally {
+      set({ switchingWorkspace: false });
+    }
+  },
+
+  createWorkspace: async (name) => {
+    try {
+      const workspace = await apiCreateWorkspace(name);
+      set((s) => ({ workspaces: [...s.workspaces, workspace], workspaceError: null }));
+      await get().switchWorkspace(workspace.workspaceId);
+      return workspace;
+    } catch (error) {
+      set({ workspaceError: message(error) });
+      return null;
+    }
+  },
+
   loadProjects: async (userId) => {
     const account = userId ?? get().userId;
     if (!account) return;
-    if (get().userId !== account) get().resetSession();
+    if (get().userId !== account) {
+      get().resetSession();
+      // A different account must not inherit the previous one's workspace.
+      setActiveWorkspace(null);
+    }
     // Never reload over work the server has not confirmed.
     if (
       get().loadStatus === 'loading' ||
@@ -422,7 +529,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       let creation = get().creation;
       if (!Object.keys(drafts).length) {
         try {
-          const recovered = readRecovered(account);
+          const recovered = readRecovered(account, get().workspaceId);
           drafts = recovered.drafts;
           creation = creation ?? recovered.creation;
         } catch {

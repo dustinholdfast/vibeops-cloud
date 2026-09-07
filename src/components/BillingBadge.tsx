@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { parseJson } from '@/src/lib/api';
+import { getActiveWorkspace, parseJson, WORKSPACE_HEADER } from '@/src/lib/api';
 import { useProjectStore } from '../store/useProjectStore';
 
 type Status = {
@@ -10,19 +10,26 @@ type Status = {
   status: string;
   projectCount: number;
   projectLimit: number | null;
+  /** False when someone else owns this workspace and its subscription. */
+  manageable: boolean;
 };
 
 export function BillingBadge() {
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
   const projectCount = useProjectStore((s) => s.projects.length);
+  const workspaceId = useProjectStore((s) => s.workspaceId);
   const [loadError, setLoadError] = useState(false);
   const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     let active = true;
     setLoadError(false);
-    void fetch('/api/billing/status', { credentials: 'include' })
+    const workspace = getActiveWorkspace();
+    void fetch('/api/billing/status', {
+      credentials: 'include',
+      headers: workspace ? { [WORKSPACE_HEADER]: workspace } : undefined,
+    })
       .then((r) => (r.ok ? parseJson<Status>(r) : null))
       .then((d) => {
         if (!active) return;
@@ -31,7 +38,7 @@ export function BillingBadge() {
       })
       .catch(() => { if (active) setLoadError(true); });
     return () => { active = false; };
-  }, [projectCount, retry]);
+  }, [projectCount, retry, workspaceId]);
 
   const openPortal = async () => {
     setBusy(true);
@@ -72,7 +79,11 @@ export function BillingBadge() {
         </span>
         <span className="text-[11px] text-text-dim tabular-nums">{limitLabel}</span>
       </div>
-      {status.plan === 'free' ? (
+      {!status.manageable ? (
+        <p className="text-[11px] text-text-dim">
+          Billing is managed by the workspace owner.
+        </p>
+      ) : status.plan === 'free' ? (
         <Link
           href="/pricing"
           className="block text-center text-xs font-medium text-purple-light hover:underline"
