@@ -9,6 +9,8 @@ import { ProjectList } from '@/src/components/ProjectList';
 import { ProjectDrawer } from '@/src/components/ProjectDrawer';
 import { useProjectStore } from '@/src/store/useProjectStore';
 import { WorkspaceSaveNotice } from '@/src/components/SaveStatus';
+import { DailyBrief } from '@/src/components/DailyBrief';
+import { WeeklyReview } from '@/src/components/WeeklyReview';
 
 export function DashboardClient({ userId }: { userId: string }) {
   const loadProjects = useProjectStore((s) => s.loadProjects);
@@ -70,7 +72,9 @@ export function DashboardClient({ userId }: { userId: string }) {
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-6xl mx-auto px-6 py-2 pb-6">
               <Header />
+              <DailyBrief />
               <StatusCards />
+              <WeeklyReview />
               <ProjectList />
             </div>
           </div>
