@@ -1,3 +1,5 @@
+import type { WorkspaceRole } from '../lib/workspace-roles';
+
 export type Stage = 'Exploring' | 'Building' | 'Testing' | 'Live' | 'Paused' | 'Archived';
 export type Priority = 'Now' | 'Next' | 'Later';
 export type Health = 'On track' | 'At risk' | 'Blocked';
@@ -32,3 +34,31 @@ export interface Project {
 export type FilterStage = Stage | 'All';
 export type FilterHealth = Health | 'All';
 export type FilterDeadline = DeadlineState | 'All';
+
+export type { WorkspaceRole };
+
+/** A workspace as the client sees it: identity plus the viewer's own role. */
+export interface Workspace {
+  workspaceId: string;
+  name: string;
+  personal: boolean;
+  ownerUserId: string;
+  role: WorkspaceRole;
+}
+
+export interface WorkspaceMember {
+  userId: string;
+  role: WorkspaceRole;
+  joinedAt: string;
+  /** Resolved from Clerk for display; absent if the lookup was unavailable. */
+  name?: string;
+  email?: string;
+}
+
+export interface WorkspaceInvite {
+  id: string;
+  email: string;
+  role: WorkspaceRole;
+  expiresAt: string;
+  createdAt: string;
+}

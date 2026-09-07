@@ -6,10 +6,12 @@ import {
   jsonb,
   index,
   uniqueIndex,
+  primaryKey,
 } from 'drizzle-orm/pg-core';
 
 /**
- * Projects are scoped to a Clerk user id (multi-tenant v1: user = workspace).
+ * Projects are scoped to a workspace. Access is granted by membership in
+ * `workspace_members`, never by the `user_id` that created the row.
  */
 export const projects = pgTable(
   'projects',
@@ -17,6 +19,12 @@ export const projects = pgTable(
     id: text('id').primaryKey(),
     version: integer('version').notNull().default(1),
     lastMutationId: text('last_mutation_id'),
+    /**
+     * Owning workspace. A user's personal workspace has the same id as their
+     * Clerk user id, so rows written before workspaces existed keep their scope.
+     */
+    workspaceId: text('workspace_id').notNull(),
+    /** The Clerk user who created the row, kept for attribution. */
     userId: text('user_id').notNull(),
     name: text('name').notNull(),
     nextAction: text('next_action').notNull().default('Define the first slice'),
@@ -33,8 +41,9 @@ export const projects = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
   },
   (t) => [
+    index('projects_workspace_id_idx').on(t.workspaceId),
+    index('projects_workspace_priority_idx').on(t.workspaceId, t.priority),
     index('projects_user_id_idx').on(t.userId),
-    index('projects_user_priority_idx').on(t.userId, t.priority),
   ]
 );
 
@@ -63,7 +72,72 @@ export const subscriptions = pgTable(
   ]
 );
 
+/**
+ * A workspace is the unit projects belong to and billing follows. Every user has
+ * a personal workspace whose id equals their Clerk user id; team workspaces get
+ * a generated id.
+ */
+export const workspaces = pgTable(
+  'workspaces',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    /** Exactly one owner. Their subscription sets the workspace plan. */
+    ownerUserId: text('owner_user_id').notNull(),
+    /** 1 for the workspace created automatically for a single user. */
+    personal: integer('personal').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [index('workspaces_owner_idx').on(t.ownerUserId)]
+);
+
+/** Membership is the only thing that grants access to a workspace. */
+export const workspaceMembers = pgTable(
+  'workspace_members',
+  {
+    workspaceId: text('workspace_id').notNull(),
+    userId: text('user_id').notNull(),
+    role: text('role').notNull().default('member'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.userId] }),
+    index('workspace_members_user_idx').on(t.userId),
+  ]
+);
+
+/**
+ * A pending invitation. The token is stored hashed so a leaked database row is
+ * not itself redeemable.
+ */
+export const workspaceInvites = pgTable(
+  'workspace_invites',
+  {
+    id: text('id').primaryKey(),
+    workspaceId: text('workspace_id').notNull(),
+    email: text('email').notNull(),
+    role: text('role').notNull().default('member'),
+    tokenHash: text('token_hash').notNull(),
+    invitedByUserId: text('invited_by_user_id').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+    acceptedByUserId: text('accepted_by_user_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    uniqueIndex('workspace_invites_token_idx').on(t.tokenHash),
+    index('workspace_invites_workspace_idx').on(t.workspaceId),
+    index('workspace_invites_email_idx').on(t.email),
+  ]
+);
+
 export type DbProject = typeof projects.$inferSelect;
 export type NewDbProject = typeof projects.$inferInsert;
 export type DbSubscription = typeof subscriptions.$inferSelect;
+export type DbWorkspace = typeof workspaces.$inferSelect;
+export type NewDbWorkspace = typeof workspaces.$inferInsert;
+export type DbWorkspaceMember = typeof workspaceMembers.$inferSelect;
+export type DbWorkspaceInvite = typeof workspaceInvites.$inferSelect;
 export type NewDbSubscription = typeof subscriptions.$inferInsert;

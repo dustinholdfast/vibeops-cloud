@@ -5,6 +5,7 @@ import { useProjectStore } from '../store/useProjectStore';
 import type { FilterStage } from '../types';
 import { cn } from '../lib/utils';
 import { BillingBadge } from './BillingBadge';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import {
   LayoutGrid,
   Compass,
@@ -87,6 +88,7 @@ export function Sidebar() {
         ))}
       </nav>
 
+      <WorkspaceSwitcher />
       <BillingBadge />
     </aside>
   );

@@ -14,12 +14,14 @@ import { WeeklyReview } from '@/src/components/WeeklyReview';
 
 export function DashboardClient({ userId }: { userId: string }) {
   const loadProjects = useProjectStore((s) => s.loadProjects);
+  const loadWorkspaces = useProjectStore((s) => s.loadWorkspaces);
   const loadStatus = useProjectStore((s) => s.loadStatus);
   const loadError = useProjectStore((s) => s.loadError);
 
   useEffect(() => {
     void loadProjects(userId);
-  }, [loadProjects, userId]);
+    void loadWorkspaces();
+  }, [loadProjects, loadWorkspaces, userId]);
 
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {

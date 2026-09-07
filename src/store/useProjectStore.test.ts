@@ -11,7 +11,12 @@ import type { Project } from '../types';
 
 // --- Environment shims (the store is browser code) ------------------------
 
-type Call = { method: string; url: string; body: Record<string, unknown> | null };
+type Call = {
+  method: string;
+  url: string;
+  body: Record<string, unknown> | null;
+  headers: Record<string, string>;
+};
 
 const memory = new Map<string, string>();
 const storage: Storage = {
@@ -34,6 +39,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     method: init?.method ?? 'GET',
     url: String(input),
     body: init?.body ? JSON.parse(String(init.body)) : null,
+    headers: (init?.headers as Record<string, string>) ?? {},
   };
   calls.push(call);
   return handler(call);
@@ -49,11 +55,11 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // The store is imported after the shims above are installed.
 let store: typeof import('./useProjectStore');
-let DRAFT_PREFIX: string;
+let draftKey: (account: string, workspaceId: string | null) => string;
 
 before(async () => {
   store = await import('./useProjectStore');
-  DRAFT_PREFIX = store.DRAFT_PREFIX;
+  draftKey = store.draftKey;
 });
 
 /** Long enough for the coalescing window plus the round trip to settle. */
@@ -159,6 +165,26 @@ describe('creating a project', () => {
 });
 
 describe('editing a project', () => {
+  it('adds a project note to the saved activity history', async () => {
+    await loadWith([serverProject()]);
+    handler = (call) =>
+      json(200, {
+        project: serverProject({ ...(call.body as Partial<Project>), version: 2 }),
+      });
+
+    state().addActivity('p1', {
+      type: 'comment',
+      message: 'Waiting on design approval',
+      author: 'You',
+    });
+    await settle();
+
+    const activity = (patches()[0].body as { activity: Project['activity'] }).activity;
+    assert.equal(activity[0].type, 'comment');
+    assert.equal(activity[0].message, 'Waiting on design approval');
+    assert.equal(shown('p1').activity[0].message, 'Waiting on design approval');
+  });
+
   it('coalesces rapid edits into one request that carries the latest value', async () => {
     await loadWith([serverProject()]);
     handler = (call) =>
@@ -337,7 +363,7 @@ describe('recovery across a reload', () => {
     };
     state().setNextAction('p1', 'Unsaved value');
     await settle();
-    assert.ok(memory.get(DRAFT_PREFIX + USER), 'the draft must be written to storage');
+    assert.ok(memory.get(draftKey(USER, null)), 'the draft must be written to storage');
 
     // A reload: memory is gone, storage is not.
     state().resetSession();
@@ -376,7 +402,7 @@ describe('recovery across a reload', () => {
       },
       creation: { id: 'bad id with spaces', name: 'Nope' },
     };
-    memory.set(DRAFT_PREFIX + USER, JSON.stringify(tampered));
+    memory.set(draftKey(USER, null), JSON.stringify(tampered));
 
     handler = () => json(200, { projects: [serverProject()] });
     await state().loadProjects(USER);
@@ -485,5 +511,89 @@ describe('session expiry', () => {
     assert.equal(state().drafts.p1?.status, 'error');
     assert.equal(shown('p1').progress, 77, 'the edit must stay on screen');
     assert.match(state().drafts.p1!.error!, /sign in again/i);
+  });
+});
+
+describe('workspaces', () => {
+  const PERSONAL = { workspaceId: USER, name: 'Personal', personal: true, ownerUserId: USER, role: 'owner' as const };
+  const TEAM = { workspaceId: 'ws_team', name: 'Team', personal: false, ownerUserId: 'user_bob', role: 'member' as const };
+
+  /** Answers the workspace list and serves per-workspace project sets. */
+  function routed(byWorkspace: Record<string, Project[]>) {
+    handler = (call) => {
+      if (call.url.includes('/api/workspaces')) return json(200, { workspaces: [PERSONAL, TEAM] });
+      const workspace = call.headers['x-vibeops-workspace'] ?? USER;
+      return json(200, { projects: byWorkspace[workspace] ?? [] });
+    };
+  }
+
+  it('switches workspace, reloads, and names it on every later request', async () => {
+    routed({
+      [USER]: [serverProject({ id: 'mine', name: 'My project' })],
+      ws_team: [serverProject({ id: 'ours', name: 'Team project' })],
+    });
+    await state().loadProjects(USER);
+    await state().loadWorkspaces();
+    assert.deepEqual(state().projects.map((p) => p.id), ['mine']);
+
+    calls = [];
+    await state().switchWorkspace('ws_team');
+
+    assert.equal(state().workspaceId, 'ws_team');
+    assert.deepEqual(state().projects.map((p) => p.id), ['ours']);
+    const reload = calls.find((c) => c.url.includes('/api/projects'));
+    assert.equal(reload?.headers['x-vibeops-workspace'], 'ws_team', 'the reload must name the workspace');
+  });
+
+  it('refuses to switch while a project has unsaved changes', async () => {
+    routed({ [USER]: [serverProject()], ws_team: [] });
+    await state().loadProjects(USER);
+    await state().loadWorkspaces();
+
+    // Leave a save unresolved so a draft is outstanding.
+    handler = () => {
+      throw new Error('offline');
+    };
+    state().setProgress('p1', 55);
+    await settle();
+    assert.ok(state().drafts.p1, 'the failed save must leave a draft');
+
+    await state().switchWorkspace('ws_team');
+
+    assert.equal(state().workspaceId, null, 'the workspace must not change');
+    assert.equal(state().operationCode, 'CLIENT');
+    assert.equal(shown('p1').progress, 55, 'the unsaved edit must still be shown');
+  });
+
+  it('refuses a workspace the user does not belong to', async () => {
+    routed({ [USER]: [] });
+    await state().loadProjects(USER);
+    await state().loadWorkspaces();
+
+    await state().switchWorkspace('ws_someone_else');
+
+    assert.equal(state().workspaceId, null);
+    assert.ok(state().workspaceError);
+  });
+
+  it('keeps recovered drafts in the workspace they were made in', async () => {
+    routed({ [USER]: [serverProject()], ws_team: [serverProject({ id: 'ours' })] });
+    await state().loadProjects(USER);
+    await state().loadWorkspaces();
+
+    const personalKey = draftKey(USER, null);
+    const teamKey = draftKey(USER, 'ws_team');
+    assert.notEqual(personalKey, teamKey, 'each workspace needs its own recovery slot');
+
+    // A draft stored against the team workspace must not surface in the personal one.
+    memory.set(
+      teamKey,
+      JSON.stringify({ drafts: { ours: { base: serverProject({ id: 'ours' }), patch: { name: 'Team draft' }, status: 'error' } }, creation: null })
+    );
+    state().resetSession();
+    routed({ [USER]: [serverProject()], ws_team: [serverProject({ id: 'ours' })] });
+    await state().loadProjects(USER);
+
+    assert.equal(state().drafts.ours, undefined, 'a team draft must not appear in the personal workspace');
   });
 });

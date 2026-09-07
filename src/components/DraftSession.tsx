@@ -18,11 +18,15 @@ export function DraftSession() {
     const switchedAccount = Boolean(previous && userId && previous !== userId);
     if (!signedOut && !switchedAccount) return;
 
-    // Keep only the incoming account's drafts; one user must never see another's.
-    const keep = userId ? DRAFT_PREFIX + userId : null;
+    // Keep only the incoming account's drafts; one user must never see
+    // another's. Keys are prefix + account + ':' + workspace, so an account may
+    // legitimately hold one entry per workspace it belongs to.
+    const keep = userId ? DRAFT_PREFIX + userId + ':' : null;
     try {
       for (const key of Object.keys(sessionStorage)) {
-        if (key.startsWith(DRAFT_PREFIX) && key !== keep) sessionStorage.removeItem(key);
+        if (key.startsWith(DRAFT_PREFIX) && !(keep && key.startsWith(keep))) {
+          sessionStorage.removeItem(key);
+        }
       }
     } catch {
       /* Storage may be disabled; in-memory state is still cleared below. */

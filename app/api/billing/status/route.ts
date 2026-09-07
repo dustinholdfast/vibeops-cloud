@@ -1,35 +1,42 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { requireDb } from '@/src/db';
 import { projects } from '@/src/db/schema';
 import { getUserPlan } from '@/src/lib/subscription';
 import { PLANS, projectLimitFor } from '@/src/lib/plans';
+import { requireScope } from '@/src/lib/request-scope';
+import { projectErrorResponse } from '@/src/lib/project-errors';
 
-export async function GET() {
-  const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
+/**
+ * Plan and usage for the workspace being viewed. A workspace bills on its
+ * owner's subscription, so a member of someone else's Pro workspace sees that
+ * workspace's limits — and `manageable` tells the UI whether this viewer is the
+ * one who can actually change them.
+ */
+export async function GET(req: Request) {
   try {
-    const billing = await getUserPlan(userId);
-    const db = requireDb();
-    const rows = await db
+    const { userId, workspace } = await requireScope(req);
+
+    const billing = await getUserPlan(workspace.ownerUserId);
+    const rows = await requireDb()
       .select({ id: projects.id })
       .from(projects)
-      .where(eq(projects.userId, userId));
-
-    const limit = projectLimitFor(billing.plan);
+      .where(eq(projects.workspaceId, workspace.workspaceId));
 
     return NextResponse.json({
       ...billing,
       planMeta: PLANS[billing.plan],
       projectCount: rows.length,
-      projectLimit: limit,
+      projectLimit: projectLimitFor(billing.plan),
+      workspace: {
+        id: workspace.workspaceId,
+        name: workspace.name,
+        personal: workspace.personal,
+        role: workspace.role,
+      },
+      manageable: workspace.ownerUserId === userId,
     });
-  } catch (e) {
-    const message = e instanceof Error ? e.message : 'Status failed';
-    return NextResponse.json({ error: message }, { status: 503 });
+  } catch (error) {
+    return projectErrorResponse(error);
   }
 }
