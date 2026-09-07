@@ -133,6 +133,26 @@ export const workspaceInvites = pgTable(
   ]
 );
 
+/**
+ * Per-user email settings. A row is created the first time a preference is read
+ * or written, so an account with no row is treated as subscribed with defaults.
+ */
+export const emailPreferences = pgTable(
+  'email_preferences',
+  {
+    userId: text('user_id').primaryKey(),
+    /** 1 = send the weekly digest. */
+    weeklyDigest: integer('weekly_digest').notNull().default(1),
+    /** Bearer of this token may unsubscribe without signing in. */
+    unsubscribeToken: text('unsubscribe_token').notNull(),
+    /** Guards against a retried cron sending the same week twice. */
+    lastSentAt: timestamp('last_sent_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [uniqueIndex('email_preferences_token_idx').on(t.unsubscribeToken)]
+);
+
 export type DbProject = typeof projects.$inferSelect;
 export type NewDbProject = typeof projects.$inferInsert;
 export type DbSubscription = typeof subscriptions.$inferSelect;
@@ -140,4 +160,5 @@ export type DbWorkspace = typeof workspaces.$inferSelect;
 export type NewDbWorkspace = typeof workspaces.$inferInsert;
 export type DbWorkspaceMember = typeof workspaceMembers.$inferSelect;
 export type DbWorkspaceInvite = typeof workspaceInvites.$inferSelect;
+export type DbEmailPreferences = typeof emailPreferences.$inferSelect;
 export type NewDbSubscription = typeof subscriptions.$inferInsert;

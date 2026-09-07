@@ -16,6 +16,7 @@ Local edition: [dustinholdfast/vibeops](https://github.com/dustinholdfast/vibeop
 | Free (5 projects) / Pro (unlimited) | ✅ |
 | Portfolio intelligence (daily brief, momentum, review) | ✅ |
 | Team workspaces (roles, invites) | ✅ |
+| Weekly digest email | ✅ |
 
 ---
 
@@ -79,6 +80,13 @@ Ranking lives in [`src/lib/portfolio.ts`](./src/lib/portfolio.ts) and the window
 review in [`src/lib/review.ts`](./src/lib/review.ts). Both are pure functions over
 `Project[]`, so the scoring is readable and unit tested.
 
+The same review powers the **weekly digest email** — one Monday message per
+person, with a section per workspace, listing what shipped, advanced, slipped
+and stalled. A week where nothing happened sends nothing.
+
+Sending is off until you configure it, and the cron is a dry run unless called
+with `?send=1`. See [DIGEST_ROLLOUT.md](./DIGEST_ROLLOUT.md).
+
 ---
 
 ## Team workspaces
@@ -139,6 +147,9 @@ resolved against the workspace owner's subscription.
 | `/api/workspaces/[id]/invites/[inviteId]` | Revoke an invitation |
 | `/api/workspaces/invites/accept` | Redeem an invitation token |
 | `/invite/[token]` | Invitation landing page |
+| `/api/cron/weekly-digest` | Digest run — dry run unless `?send=1` |
+| `/api/email/preferences` | Read / set the weekly digest opt-in |
+| `/api/email/unsubscribe` | One-click unsubscribe by token (public) |
 
 ---
 
