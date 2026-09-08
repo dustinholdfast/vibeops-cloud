@@ -1,40 +1,41 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #0a0a0c;
-  --color-surface: #121214;
-  --color-surface-elevated: #1a1a1e;
+  --color-background: #07080c;
+  --color-surface: #11151f;
+  --color-surface-elevated: #161b28;
   --color-border: #2a2a30;
   --color-border-subtle: #1f1f24;
   --color-purple: #8b7cf6;
   --color-purple-light: #a78bfa;
   --color-purple-dim: #6d5bd0;
-  --color-text: #f4f4f5;
-  --color-text-muted: #a1a1aa;
-  --color-text-dim: #71717a;
+  --color-text: #eceef4;
+  --color-text-muted: #8b93a7;
+  --color-text-dim: #5d6578;
   --color-success: #34d399;
   --color-warning: #fbbf24;
-  --color-danger: #f87171;
-  --color-blue: #60a5fa;
+  --color-danger: #fb7185;
+  --color-blue: #7dd3fc;
   --color-orange: #fb923c;
+  --font-sans: "Geist", Inter, ui-sans-serif, system-ui, sans-serif;
 }
 
 html.light {
-  --color-background: #f4f4f5;
+  --color-background: #f3f4f8;
   --color-surface: #ffffff;
   --color-surface-elevated: #ececee;
   --color-border: #d4d4d8;
   --color-border-subtle: #e4e4e7;
-  --color-purple: #8b7cf6;
-  --color-purple-light: #7c6ee8;
+  --color-purple: #6d5efc;
+  --color-purple-light: #5b4cf0;
   --color-purple-dim: #6d5bd0;
   --color-text: #18181b;
   --color-text-muted: #52525b;
   --color-text-dim: #71717a;
-  --color-success: #059669;
-  --color-warning: #d97706;
-  --color-danger: #dc2626;
-  --color-blue: #2563eb;
+  --color-success: #047857;
+  --color-warning: #b45309;
+  --color-danger: #e11d48;
+  --color-blue: #0369a1;
   --color-orange: #ea580c;
   color-scheme: light;
 }
@@ -56,11 +57,20 @@ body {
 
 body {
   background-color: var(--color-background);
+  background-image:
+    radial-gradient(1200px 600px at 12% -10%, rgba(139, 124, 255, 0.14), transparent 55%),
+    radial-gradient(900px 500px at 92% 0%, rgba(94, 234, 212, 0.06), transparent 50%);
   color: var(--color-text);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: Geist, Inter, ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+html.light body {
+  background-image:
+    radial-gradient(1200px 600px at 12% -10%, rgba(109, 94, 252, 0.08), transparent 55%),
+    radial-gradient(900px 500px at 92% 0%, rgba(15, 118, 110, 0.05), transparent 50%);
 }
 
 ::-webkit-scrollbar {

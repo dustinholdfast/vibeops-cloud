@@ -20,11 +20,11 @@ export default async function PricingPage() {
               </span>
             </span>
           </Link>
-          <h1 className="text-3xl font-semibold tracking-tight text-text">
-            Simple pricing
+          <h1 className="text-4xl font-semibold tracking-tight text-text">
+            Simple <span className="text-purple-light">pricing</span>
           </h1>
           <p className="text-text-muted text-sm max-w-md mx-auto">
-            Start free. Upgrade when five projects isn’t enough.
+            Start free. Upgrade when five projects isn’t enough — same focused tracker, just synced.
           </p>
         </div>
 
@@ -37,14 +37,14 @@ export default async function PricingPage() {
                 key={id}
                 className={
                   highlighted
-                    ? 'rounded-2xl border border-purple/50 bg-purple/5 p-6 shadow-[0_0_40px_-12px_rgba(139,124,246,0.35)]'
-                    : 'rounded-2xl border border-border bg-surface p-6'
+                    ? 'rounded-3xl border border-purple/50 bg-purple/5 p-7 shadow-[0_0_40px_-12px_rgba(139,124,246,0.35)]'
+                    : 'rounded-3xl border border-border bg-surface p-7'
                 }
               >
                 <div className="flex items-baseline justify-between gap-2">
                   <h2 className="text-lg font-semibold text-text">{plan.name}</h2>
                   <div className="text-right">
-                    <span className="text-2xl font-semibold text-text">
+                    <span className="text-3xl font-semibold tracking-tight text-text">
                       {plan.priceMonthlyLabel}
                     </span>
                     {id === 'pro' && (
@@ -55,7 +55,7 @@ export default async function PricingPage() {
                 <p className="mt-2 text-sm text-text-muted">{plan.description}</p>
                 <ul className="mt-5 space-y-2">
                   {plan.features.map((f) => (
-                    <li key={f} className="text-sm text-text-muted flex gap-2">
+                    <li key={f} className="text-sm text-text flex gap-2">
                       <span className="text-purple-light">✓</span>
                       <span>{f}</span>
                     </li>

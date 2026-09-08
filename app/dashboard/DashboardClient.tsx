@@ -11,12 +11,14 @@ import { useProjectStore } from '@/src/store/useProjectStore';
 import { WorkspaceSaveNotice } from '@/src/components/SaveStatus';
 import { DailyBrief } from '@/src/components/DailyBrief';
 import { WeeklyReview } from '@/src/components/WeeklyReview';
+import { EmptyWorkspace } from '@/src/components/EmptyWorkspace';
 
 export function DashboardClient({ userId }: { userId: string }) {
   const loadProjects = useProjectStore((s) => s.loadProjects);
   const loadWorkspaces = useProjectStore((s) => s.loadWorkspaces);
   const loadStatus = useProjectStore((s) => s.loadStatus);
   const loadError = useProjectStore((s) => s.loadError);
+  const projects = useProjectStore((s) => s.projects);
 
   useEffect(() => {
     void loadProjects(userId);
@@ -44,11 +46,7 @@ export function DashboardClient({ userId }: { userId: string }) {
         <div className="flex items-center justify-end gap-3 px-6 pt-4">
           <UserButton
             afterSignOutUrl="/"
-            appearance={{
-              elements: {
-                avatarBox: 'w-8 h-8',
-              },
-            }}
+            appearance={{ elements: { avatarBox: 'w-8 h-8' } }}
           />
         </div>
 
@@ -59,9 +57,7 @@ export function DashboardClient({ userId }: { userId: string }) {
         ) : loadStatus === 'error' ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 text-center">
             <p className="text-sm text-danger font-medium">Could not load projects</p>
-            <p className="text-xs text-text-dim max-w-md">
-              {loadError || 'Please try again in a moment.'}
-            </p>
+            <p className="text-xs text-text-dim max-w-md">{loadError || 'Please try again in a moment.'}</p>
             <button
               type="button"
               onClick={() => void loadProjects()}
@@ -74,10 +70,16 @@ export function DashboardClient({ userId }: { userId: string }) {
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-6xl mx-auto px-6 py-2 pb-6">
               <Header />
-              <DailyBrief />
-              <StatusCards />
-              <WeeklyReview />
-              <ProjectList />
+              {projects.length === 0 ? (
+                <EmptyWorkspace />
+              ) : (
+                <>
+                  <DailyBrief />
+                  <StatusCards />
+                  <WeeklyReview />
+                  <ProjectList />
+                </>
+              )}
             </div>
           </div>
         )}
