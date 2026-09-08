@@ -27,21 +27,27 @@ export function Header() {
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === 'dark';
   useEffect(() => {
-    if (creation) { setNewName(creation.name); setShowAdd(true); }
+    if (creation) {
+      setNewName(creation.name);
+      setShowAdd(true);
+    }
   }, [creation]);
 
   const nowProjects = projects.filter((p) => p.priority === 'Now');
   const nowCount = nowProjects.length;
 
-  let heading: string;
+  let heading = 'Command center';
+  let sub =
+    'Every active project gets one unambiguous next action.';
   if (nowCount === 0) {
-    heading = 'Nothing is claimed for today';
+    sub = 'Nothing is claimed for today. Pick a Now slot and the rest gets quieter.';
   } else if (nowCount === 1) {
-    heading = `${nowProjects[0].name} is claimed for today`;
+    heading = nowProjects[0].name;
+    sub = 'Claimed for today';
   } else if (nowCount <= MAX_NOW_SLOTS) {
-    heading = `${nowCount} projects claimed for today`;
+    sub = `${nowCount} projects claimed for today`;
   } else {
-    heading = `${nowCount} projects claimed (over the ${MAX_NOW_SLOTS}-slot soft limit)`;
+    sub = `${nowCount} projects claimed (over the ${MAX_NOW_SLOTS}-slot soft limit)`;
   }
 
   const handleAdd = async () => {
@@ -79,11 +85,9 @@ export function Header() {
       let list: Project[];
       try {
         const raw = JSON.parse(String(reader.result));
-        if (Array.isArray(raw)) {
-          list = raw;
-        } else if (raw && Array.isArray(raw.projects)) {
-          list = raw.projects;
-        } else {
+        if (Array.isArray(raw)) list = raw;
+        else if (raw && Array.isArray(raw.projects)) list = raw.projects;
+        else {
           reportError(
             'That file is not a VibeOps export: expected an array of projects or { projects: [...] }.'
           );
@@ -100,7 +104,6 @@ export function Header() {
       ) {
         return;
       }
-      // importProjects reports its own failures and leaves current data intact.
       await importProjects(list);
     };
     reader.readAsText(file);
@@ -115,6 +118,7 @@ export function Header() {
             {format(new Date(), 'EEEE, MMMM d').toUpperCase()}
           </p>
           <h1 className="text-2xl font-semibold text-text mt-1 tracking-tight">{heading}</h1>
+          <p className="text-sm text-text-muted mt-1 max-w-md">{sub}</p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -136,8 +140,11 @@ export function Header() {
               placeholder="Search projects"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-48 pl-9 pr-3 py-2 rounded-lg bg-surface border border-border text-sm text-text placeholder:text-text-dim focus:outline-none focus:border-purple/50 focus:ring-1 focus:ring-purple/30"
+              className="w-52 pl-9 pr-12 py-2 rounded-lg bg-surface border border-border text-sm text-text placeholder:text-text-dim focus:outline-none focus:border-purple/50 focus:ring-1 focus:ring-purple/30"
             />
+            <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 hidden sm:inline text-[10px] text-text-dim border border-border rounded px-1.5 py-0.5">
+              ⌘K
+            </kbd>
           </div>
 
           <button
@@ -179,7 +186,10 @@ export function Header() {
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleAdd();
-                  if (e.key === 'Escape' && !creating) { cancelCreation(); setShowAdd(false); }
+                  if (e.key === 'Escape' && !creating) {
+                    cancelCreation();
+                    setShowAdd(false);
+                  }
                 }}
                 className="w-48 px-3 py-2 rounded-lg bg-surface border border-border text-sm text-text placeholder:text-text-dim focus:outline-none focus:border-purple/50"
               />
@@ -192,7 +202,10 @@ export function Header() {
               </button>
               <button
                 disabled={creating}
-                onClick={() => { cancelCreation(); setShowAdd(false); }}
+                onClick={() => {
+                  cancelCreation();
+                  setShowAdd(false);
+                }}
                 className="px-2 py-2 text-text-dim hover:text-text text-sm"
               >
                 Cancel
