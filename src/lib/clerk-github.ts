@@ -13,10 +13,19 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : null;
 }
 
-function userSettingsFrom(clerk: unknown): UserSettings | undefined {
+function readEnvironment(clerk: unknown): Record<string, unknown> | null {
   const root = asRecord(clerk);
-  const client = asRecord(root?.client);
-  const environment = asRecord(client?.environment);
+  if (!root) return null;
+  return (
+    asRecord(root.environment) ??
+    asRecord(root.__unstable__environment) ??
+    asRecord(asRecord(root.client)?.environment) ??
+    null
+  );
+}
+
+function userSettingsFrom(clerk: unknown): UserSettings | undefined {
+  const environment = readEnvironment(clerk);
   const settings = asRecord(environment?.userSettings);
   if (!settings) return undefined;
 
@@ -63,11 +72,11 @@ export function clerkSocialStrategies(clerk: unknown): string[] {
   return [...new Set([...fromList, ...fromMap])].filter((strategy) => strategy.startsWith('oauth_'));
 }
 
-export function clerkGitHubStrategy(clerk: unknown): string | null {
+export function clerkGitHubStrategy(clerk: unknown): string {
   const strategies = clerkSocialStrategies(clerk);
   return (
     strategies.find((strategy) => strategy === 'oauth_github') ??
     strategies.find((strategy) => /github/i.test(strategy)) ??
-    null
+    'oauth_github'
   );
 }
