@@ -42,7 +42,7 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
 };
 
 export function isProStatus(status: string | null | undefined): boolean {
-  return status === 'active' || status === 'trialing';
+  return status === 'active' || status === 'trialing' || status === 'complimentary';
 }
 
 export function resolvePlan(
