@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getOptionalUserId } from '@/src/lib/auth';
+import { GitHubAuthButton } from '@/src/components/GitHubAuthButton';
 
 const tiles = [
   { title: 'Now slots', body: 'Three focus cards. Everything else waits.' },
@@ -50,19 +51,22 @@ export default async function HomePage() {
           <p className="mt-4 text-text-muted text-base leading-relaxed max-w-lg mx-auto">
             The same focused tracker as Local — with accounts, workspaces, and Pro when five projects is no longer enough.
           </p>
-          <div className="mt-8 flex items-center justify-center gap-3 flex-wrap">
-            <Link
-              href="/sign-up"
-              className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-purple hover:bg-purple-light text-white text-sm font-semibold shadow-[0_10px_24px_-12px_rgba(139,124,255,0.9)]"
-            >
-              Start free
-            </Link>
-            <Link
-              href="/pricing"
-              className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl border border-border bg-surface text-text text-sm font-medium hover:bg-surface-elevated"
-            >
-              See pricing
-            </Link>
+          <div className="mt-8 mx-auto w-full max-w-xs space-y-3">
+            <GitHubAuthButton mode="sign-up" label="Continue with GitHub" />
+            <div className="flex items-center justify-center gap-3">
+              <Link
+                href="/sign-up"
+                className="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-purple hover:bg-purple-light text-white text-sm font-semibold"
+              >
+                Start free
+              </Link>
+              <Link
+                href="/pricing"
+                className="inline-flex items-center justify-center px-4 py-2 rounded-xl border border-border bg-surface text-text text-sm font-medium hover:bg-surface-elevated"
+              >
+                See pricing
+              </Link>
+            </div>
           </div>
         </div>
 
