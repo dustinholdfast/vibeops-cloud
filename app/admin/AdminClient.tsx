@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { UserButton } from '@clerk/nextjs';
-import { parseJson } from '@/src/lib/api';
 
 type Account = {
   userId: string;
@@ -20,6 +19,10 @@ type Account = {
   projectLimit: number | null;
 };
 
+async function readBody(res: Response) {
+  return (await res.json().catch(() => ({}))) as { error?: string; accounts?: Account[] };
+}
+
 export function AdminClient() {
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -29,19 +32,18 @@ export function AdminClient() {
   const load = async () => {
     setError(null);
     const res = await fetch('/api/admin/accounts', { credentials: 'include' });
+    const body = await readBody(res);
     if (res.status === 403) {
       setError('This account is not on the admin allowlist.');
       setAccounts([]);
       return;
     }
     if (!res.ok) {
-      const body = await parseJson<{ error?: string }>(res).catch(() => ({}));
       setError(body.error || 'Could not load accounts.');
       setAccounts([]);
       return;
     }
-    const data = await parseJson<{ accounts: Account[] }>(res);
-    setAccounts(data.accounts);
+    setAccounts(body.accounts ?? []);
   };
 
   useEffect(() => {
@@ -68,7 +70,7 @@ export function AdminClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, plan, cancelStripe }),
       });
-      const body = await parseJson<{ error?: string }>(res);
+      const body = await readBody(res);
       if (!res.ok) {
         alert(body.error || 'Could not update plan');
         return;
@@ -102,12 +104,10 @@ export function AdminClient() {
 
       <main className="max-w-6xl mx-auto px-6 py-6">
         <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
-          <div>
-            <p className="text-sm text-text-muted">
-              Plans are stored on the account that owns the workspace. Complimentary Pro does not
-              create a Stripe charge.
-            </p>
-          </div>
+          <p className="text-sm text-text-muted max-w-xl">
+            Plans follow the workspace owner. Granting Pro is complimentary — no Stripe charge.
+            Cancel Stripe only when you also want the paid subscription torn down.
+          </p>
           <input
             type="search"
             value={query}
@@ -133,18 +133,13 @@ export function AdminClient() {
               </div>
             ) : (
               filtered.map((account) => (
-                <article
-                  key={account.userId}
-                  className="rounded-2xl border border-border bg-surface px-4 py-4"
-                >
+                <article key={account.userId} className="rounded-2xl border border-border bg-surface px-4 py-4">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="min-w-0">
                       <p className="font-semibold text-text truncate">
                         {account.name || account.email || account.userId}
                       </p>
-                      <p className="text-sm text-text-muted truncate">
-                        {account.email ?? 'No email on file'}
-                      </p>
+                      <p className="text-sm text-text-muted truncate">{account.email ?? 'No email on file'}</p>
                       <p className="mt-1 text-[11px] text-text-dim font-mono truncate">{account.userId}</p>
                       <p className="mt-2 text-xs text-text-dim">
                         {account.projectCount} project{account.projectCount === 1 ? '' : 's'} across{' '}
