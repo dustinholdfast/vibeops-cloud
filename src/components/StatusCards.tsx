@@ -1,8 +1,8 @@
 'use client';
 
 import { useProjectStore, MAX_NOW_SLOTS } from '../store/useProjectStore';
-import { differenceInDays } from 'date-fns';
 import { cn, getDeadlineState } from '../lib/utils';
+import { isRotting, quietLabel } from '../lib/rotting';
 import type { Project } from '../types';
 
 function pad(n: number) {
@@ -16,10 +16,7 @@ export function StatusCards() {
   const saving = Object.values(drafts).some((d) => d.status === 'saving');
 
   const nowProjects = projects.filter((p) => p.priority === 'Now');
-  const rotting = projects.filter((p) => {
-    const days = differenceInDays(new Date(), new Date(p.lastTouched));
-    return days >= 7 && p.stage !== 'Archived' && p.stage !== 'Live';
-  });
+  const rotting = projects.filter((p) => isRotting(p));
 
   const inFlight = projects.filter(
     (p) => p.stage === 'Exploring' || p.stage === 'Building' || p.stage === 'Testing'
@@ -77,7 +74,7 @@ export function StatusCards() {
       },
     },
     {
-      label: 'Stale (7+ days)',
+      label: 'Rotting',
       count: rotting.length,
       projects: rotting,
       filterAction: () => {
@@ -109,7 +106,7 @@ export function StatusCards() {
             {pad(totalAttention)}
           </p>
           <p className="mt-2 text-xs text-text-dim">
-            {totalAttention === 0 ? 'All clear' : 'Overdue, blocked, at risk, or stale'}
+            {totalAttention === 0 ? 'All clear' : 'Overdue, blocked, at risk, or rotting'}
           </p>
         </article>
         <article className="rounded-2xl border border-border bg-surface p-4">
@@ -134,27 +131,43 @@ export function StatusCards() {
           <p className="text-xs text-text-dim">{nowProjects.length} / {MAX_NOW_SLOTS}</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {nowProjects.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => openDrawer(p.id)}
-              className="relative overflow-hidden text-left rounded-2xl border border-border bg-surface p-4 hover:border-purple/40 transition-colors"
-            >
-              <span className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-purple to-blue" />
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                <span className="rounded-full bg-surface-elevated px-2 py-0.5 text-[11px] text-text-muted">{p.stage}</span>
-                <span className="rounded-full bg-surface-elevated px-2 py-0.5 text-[11px] text-text-muted">{p.health}</span>
-                <span className="rounded-full bg-purple/15 px-2 py-0.5 text-[11px] text-purple-light">Now</span>
-              </div>
-              <p className="font-semibold text-text">{p.name}</p>
-              <div className="mt-3 h-1 rounded-full bg-border-subtle overflow-hidden">
-                <div className="h-full rounded-full bg-gradient-to-r from-purple to-blue" style={{ width: `${p.progress}%` }} />
-              </div>
-              <p className="mt-3 text-[11px] uppercase tracking-wider text-text-dim">Next action</p>
-              <p className="text-sm text-text truncate">{p.nextAction || '—'}</p>
-            </button>
-          ))}
+          {nowProjects.map((p) => {
+            const rottingNow = isRotting(p);
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => openDrawer(p.id)}
+                className={cn(
+                  'relative overflow-hidden text-left rounded-2xl border bg-surface p-4 transition-colors',
+                  rottingNow ? 'border-warning/50 hover:border-warning' : 'border-border hover:border-purple/40'
+                )}
+              >
+                <span
+                  className={cn(
+                    'absolute inset-x-0 top-0 h-0.5',
+                    rottingNow ? 'bg-warning' : 'bg-gradient-to-r from-purple to-blue'
+                  )}
+                />
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  <span className="rounded-full bg-surface-elevated px-2 py-0.5 text-[11px] text-text-muted">{p.stage}</span>
+                  <span className="rounded-full bg-surface-elevated px-2 py-0.5 text-[11px] text-text-muted">{p.health}</span>
+                  <span className="rounded-full bg-purple/15 px-2 py-0.5 text-[11px] text-purple-light">Now</span>
+                  {rottingNow && (
+                    <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[11px] text-warning">
+                      {quietLabel(p)}
+                    </span>
+                  )}
+                </div>
+                <p className="font-semibold text-text">{p.name}</p>
+                <div className="mt-3 h-1 rounded-full bg-border-subtle overflow-hidden">
+                  <div className="h-full rounded-full bg-gradient-to-r from-purple to-blue" style={{ width: `${p.progress}%` }} />
+                </div>
+                <p className="mt-3 text-[11px] uppercase tracking-wider text-text-dim">Next action</p>
+                <p className="text-sm text-text truncate">{p.nextAction || '—'}</p>
+              </button>
+            );
+          })}
           {Array.from({ length: emptyCount }).map((_, i) => {
             const suggestion = claimable[i];
             return (
