@@ -7,6 +7,7 @@ import { cn } from '../lib/utils';
 import { BillingBadge } from './BillingBadge';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { DigestPreference } from './DigestPreference';
+import { AdminLink } from './AdminLink';
 import {
   LayoutGrid,
   Compass,
@@ -98,6 +99,7 @@ export function Sidebar() {
         </p>
         <WorkspaceSwitcher />
         <DigestPreference />
+        <AdminLink />
         <BillingBadge />
       </div>
     </aside>
