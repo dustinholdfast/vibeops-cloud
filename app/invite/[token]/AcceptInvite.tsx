@@ -13,7 +13,6 @@ type Status =
 export function AcceptInvite({ token }: { token: string }) {
   const router = useRouter();
   const [status, setStatus] = useState<Status>({ state: 'working' });
-  // React may mount effects twice in development; the token is single-use.
   const attempted = useRef(false);
 
   useEffect(() => {
@@ -29,8 +28,7 @@ export function AcceptInvite({ token }: { token: string }) {
       } catch (error) {
         setStatus({
           state: 'failed',
-          message:
-            error instanceof Error ? error.message : 'That invitation could not be accepted.',
+          message: error instanceof Error ? error.message : 'That invitation could not be accepted.',
         });
       }
     })();
@@ -38,31 +36,31 @@ export function AcceptInvite({ token }: { token: string }) {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-6 text-text">
-      <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 text-center">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-8 text-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.svg" alt="" width={40} height={40} className="mx-auto mb-4 w-10 h-10 rounded-full" />
         {status.state === 'working' && (
           <>
-            <Loader2 size={22} className="mx-auto animate-spin text-purple-light" aria-hidden />
+            <Loader2 size={20} className="mx-auto animate-spin text-purple-light" aria-hidden />
             <p className="mt-3 text-sm text-text-muted">Checking your invitation…</p>
           </>
         )}
-
         {status.state === 'joined' && (
           <>
             <CheckCircle2 size={22} className="mx-auto text-success" aria-hidden />
-            <h1 className="mt-3 text-base font-semibold">You have joined {status.name}</h1>
-            <p className="mt-1 text-sm text-text-muted">Taking you to the workspace…</p>
+            <h1 className="mt-3 text-lg font-semibold tracking-tight">You have joined {status.name}</h1>
+            <p className="mt-1 text-sm text-text-muted">Taking you to the command center…</p>
           </>
         )}
-
         {status.state === 'failed' && (
           <>
             <CircleAlert size={22} className="mx-auto text-warning" aria-hidden />
-            <h1 className="mt-3 text-base font-semibold">This invitation did not work</h1>
+            <h1 className="mt-3 text-lg font-semibold tracking-tight">This invitation did not work</h1>
             <p className="mt-1 text-sm text-text-muted">{status.message}</p>
             <button
               type="button"
               onClick={() => router.push('/dashboard')}
-              className="mt-4 rounded-lg bg-purple px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-light"
+              className="mt-5 rounded-lg bg-purple px-4 py-2 text-sm font-medium text-white hover:bg-purple-light"
             >
               Go to your dashboard
             </button>
