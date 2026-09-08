@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useProjectStore } from '../store/useProjectStore';
 import {
   formatLastTouched,
-  formatFullDate,
   formatTargetDate,
   getDeadlineState,
   deadlineLabel,
@@ -16,6 +15,7 @@ import {
 import type { Stage, Priority, Health } from '../types';
 import { X, ExternalLink, Github, Pencil, Check, Trash2, Hand, MessageSquarePlus } from 'lucide-react';
 import { SaveStatus } from './SaveStatus';
+import { GitHubPushButton } from './GitHubPushButton';
 import { projectMomentum, type MomentumState } from '../lib/review';
 
 const stages: Stage[] = ['Exploring', 'Building', 'Testing', 'Live', 'Paused', 'Archived'];
@@ -171,6 +171,12 @@ export function ProjectDrawer() {
                     {project.repoUrl ? <a href={project.repoUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-border px-3 py-2 text-sm text-text hover:border-purple/40"><Github size={14} /> Repo</a> : <span className="rounded-xl border border-dashed border-border px-3 py-2 text-sm text-text-dim text-center">No repo</span>}
                   </div>
                 )}
+              </div>
+              <div>
+                <span className="text-[11px] uppercase tracking-wider text-text-dim">GitHub</span>
+                <div className="mt-2">
+                  <GitHubPushButton projectId={project.id} repoUrl={project.repoUrl} />
+                </div>
               </div>
               <div>
                 <label htmlFor="drawer-note" className="text-[11px] uppercase tracking-wider text-text-dim">Add note</label>
