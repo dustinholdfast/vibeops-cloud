@@ -10,7 +10,7 @@ import {
   HEALTH_OPTIONS,
 } from '../lib/utils';
 import type { Priority, Stage, Health, DeadlineState } from '../types';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Github } from 'lucide-react';
 import { SaveStatusChip } from './SaveStatus';
 
 const stageColor: Record<Stage, string> = {
@@ -36,6 +36,9 @@ const deadlineStyles: Record<DeadlineState, string> = {
   future: 'text-text-muted',
   inactive: 'text-text-dim',
 };
+
+const chip =
+  'rounded-full bg-surface-elevated px-2 py-0.5 text-[11px] text-text-muted';
 
 export function ProjectList() {
   const {
@@ -65,71 +68,51 @@ export function ProjectList() {
         : true
     );
 
-  const hasActiveSecondaryFilter =
-    healthFilter !== 'All' || deadlineFilter !== 'All';
+  const hasActiveSecondaryFilter = healthFilter !== 'All' || deadlineFilter !== 'All';
 
   return (
     <div className="mt-8">
-      <div className="flex items-center justify-between mb-3 gap-4 flex-wrap">
-        <h2 className="text-sm font-medium text-text">
-          All projects
-          <span className="ml-2 text-text-dim font-normal">
-            {filtered.length} project{filtered.length === 1 ? '' : 's'}
-          </span>
-        </h2>
+      <div className="flex items-end justify-between mb-3 gap-4 flex-wrap">
+        <div>
+          <h2 className="text-sm font-medium text-text">All projects</h2>
+          <p className="text-xs text-text-dim mt-0.5">
+            {filtered.length} match{filtered.length === 1 ? '' : 'es'}
+            {filter !== 'All' ? ` in ${filter}` : ''}
+          </p>
+        </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5" role="group" aria-label="Filter by health">
-            <span className="text-[11px] uppercase tracking-wider text-text-dim mr-1">
-              Health
-            </span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <FilterGroup label="Health">
             {(['All', ...HEALTH_OPTIONS] as const).map((h) => (
-              <button
+              <FilterChip
                 key={h}
-                type="button"
+                active={healthFilter === h}
                 onClick={() => setHealthFilter(h)}
-                className={cn(
-                  'px-2 py-0.5 rounded text-xs font-medium transition-colors border',
-                  healthFilter === h
-                    ? 'bg-purple/20 text-purple-light border-purple/40'
-                    : 'bg-surface-elevated text-text-dim border-transparent hover:text-text'
-                )}
-                aria-pressed={healthFilter === h}
               >
                 {h}
-              </button>
+              </FilterChip>
             ))}
-          </div>
+          </FilterGroup>
 
-          <div className="flex items-center gap-1.5" role="group" aria-label="Filter by deadline">
-            <span className="text-[11px] uppercase tracking-wider text-text-dim mr-1">
-              Deadline
-            </span>
+          <FilterGroup label="Deadline">
             {(
               [
                 { value: 'All', label: 'All' },
                 { value: 'overdue', label: 'Overdue' },
-                { value: 'due-today', label: 'Due today' },
-                { value: 'due-soon', label: 'Due soon' },
+                { value: 'due-today', label: 'Today' },
+                { value: 'due-soon', label: 'Soon' },
                 { value: 'none', label: 'No date' },
               ] as const
             ).map((d) => (
-              <button
+              <FilterChip
                 key={d.value}
-                type="button"
+                active={deadlineFilter === d.value}
                 onClick={() => setDeadlineFilter(d.value)}
-                className={cn(
-                  'px-2 py-0.5 rounded text-xs font-medium transition-colors border',
-                  deadlineFilter === d.value
-                    ? 'bg-purple/20 text-purple-light border-purple/40'
-                    : 'bg-surface-elevated text-text-dim border-transparent hover:text-text'
-                )}
-                aria-pressed={deadlineFilter === d.value}
               >
                 {d.label}
-              </button>
+              </FilterChip>
             ))}
-          </div>
+          </FilterGroup>
 
           {hasActiveSecondaryFilter && (
             <button
@@ -138,160 +121,171 @@ export function ProjectList() {
                 setHealthFilter('All');
                 setDeadlineFilter('All');
               }}
-              className="text-xs text-text-dim hover:text-text underline"
+              className="text-xs text-text-dim hover:text-text"
             >
-              Clear filters
+              Clear
             </button>
           )}
         </div>
       </div>
 
-      <div className="rounded-xl border border-border bg-surface overflow-hidden">
-        <div
-          className="grid gap-3 px-4 py-2.5 text-[11px] font-medium tracking-wider text-text-dim uppercase border-b border-border-subtle"
-          style={{
-            gridTemplateColumns: 'minmax(180px,1.4fr) 100px 130px 110px 120px 100px 70px',
-          }}
-        >
-          <div>Project & Next Action</div>
-          <div>Stage</div>
-          <div>Priority</div>
-          <div>Health</div>
-          <div>Target</div>
-          <div>Last Touched</div>
-          <div>Links</div>
+      {filtered.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border px-4 py-12 text-center text-sm text-text-dim">
+          No projects match the current filters.
         </div>
-
-        {filtered.length === 0 ? (
-          <div className="px-4 py-12 text-center text-sm text-text-dim">
-            No projects match the current filters.
-          </div>
-        ) : (
-          filtered.map((project) => {
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((project) => {
             const deadline = getDeadlineState(project.targetDate, project.stage);
             return (
               <div
                 key={project.id}
                 onClick={() => openDrawer(project.id)}
-                className="grid gap-3 px-4 py-3.5 border-b border-border-subtle last:border-0 hover:bg-surface-elevated/60 cursor-pointer transition-colors group"
-                style={{
-                  gridTemplateColumns:
-                    'minmax(180px,1.4fr) 100px 130px 110px 120px 100px 70px',
-                }}
+                className="group rounded-2xl border border-border bg-surface px-4 py-3.5 hover:border-purple/40 cursor-pointer transition-colors"
               >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-text truncate">{project.name}</span>
-                    <div className="h-1 w-12 rounded-full bg-border-subtle overflow-hidden flex-shrink-0">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-text truncate">{project.name}</span>
+                      <span className={chip}>
+                        <span
+                          className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle', stageColor[project.stage])}
+                          aria-hidden
+                        />
+                        {project.stage}
+                      </span>
+                      {project.priority === 'Now' && (
+                        <span className="rounded-full bg-purple/15 px-2 py-0.5 text-[11px] text-purple-light">Now</span>
+                      )}
+                    </div>
+                    <p className="text-sm text-text-muted truncate mt-1">{project.nextAction || 'No next action yet'}</p>
+                    <div className="mt-2.5 h-1 rounded-full bg-border-subtle overflow-hidden max-w-xs">
                       <div
-                        className="h-full bg-purple rounded-full"
+                        className="h-full rounded-full bg-gradient-to-r from-purple to-blue"
                         style={{ width: `${project.progress}%` }}
                       />
                     </div>
                   </div>
-                  <p className="text-sm text-text-muted truncate mt-0.5">
-                    {project.nextAction}
-                  </p>
-                </div>
 
-                <div className="flex items-center">
-                  <span className="inline-flex items-center gap-1.5 text-sm text-text-muted">
-                    <span
-                      className={cn('w-1.5 h-1.5 rounded-full', stageColor[project.stage])}
-                      aria-hidden
-                    />
-                    {project.stage}
-                  </span>
-                </div>
-
-                <div
-                  className="flex items-center gap-1"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {(['Now', 'Next', 'Later'] as Priority[]).map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setPriority(project.id, p)}
+                  <div className="flex flex-col items-end gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-1">
+                      {(['Now', 'Next', 'Later'] as Priority[]).map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setPriority(project.id, p)}
+                          className={cn(
+                            'px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors',
+                            project.priority === p
+                              ? 'bg-purple text-white'
+                              : 'bg-surface-elevated text-text-dim hover:text-text'
+                          )}
+                          aria-pressed={project.priority === p}
+                          aria-label={`Set priority to ${p}`}
+                        >
+                          {p}
+                        </button>
+                      ))}
+                    </div>
+                    <select
+                      id={`health-${project.id}`}
+                      value={project.health}
+                      onChange={(e) => setHealth(project.id, e.target.value as Health)}
                       className={cn(
-                        'px-2 py-0.5 rounded text-xs font-medium transition-colors',
-                        project.priority === p
-                          ? 'bg-purple text-white'
-                          : 'bg-surface-elevated text-text-dim hover:text-text hover:bg-border'
+                        'appearance-none text-[11px] font-medium rounded-full px-2 py-0.5 border cursor-pointer focus:outline-none focus:ring-1 focus:ring-purple/50',
+                        healthStyles[project.health]
                       )}
-                      aria-pressed={project.priority === p}
-                      aria-label={`Set priority to ${p}`}
+                      aria-label={`Health status: ${project.health}`}
                     >
-                      {p}
-                    </button>
-                  ))}
+                      {HEALTH_OPTIONS.map((h) => (
+                        <option key={h} value={h}>
+                          {h}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
-                <div
-                  className="flex items-center"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <label className="sr-only" htmlFor={`health-${project.id}`}>
-                    Health for {project.name}
-                  </label>
-                  <select
-                    id={`health-${project.id}`}
-                    value={project.health}
-                    onChange={(e) => setHealth(project.id, e.target.value as Health)}
-                    className={cn(
-                      'appearance-none text-xs font-medium rounded px-2 py-1 border cursor-pointer focus:outline-none focus:ring-1 focus:ring-purple/50',
-                      healthStyles[project.health]
+                <div className="mt-3 flex items-center justify-between gap-3 text-[11px] text-text-dim">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {deadline === 'none' ? (
+                      <span>No target</span>
+                    ) : (
+                      <span className={deadlineStyles[deadline]}>
+                        {deadlineLabel(deadline)}
+                        {project.targetDate && deadline !== 'inactive'
+                          ? ` · ${formatTargetDate(project.targetDate)}`
+                          : ''}
+                      </span>
                     )}
-                    aria-label={`Health status: ${project.health}`}
-                  >
-                    {HEALTH_OPTIONS.map((h) => (
-                      <option key={h} value={h}>
-                        {h}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex items-center text-sm">
-                  {deadline === 'none' ? (
-                    <span className="text-text-dim italic text-xs">Set a target date</span>
-                  ) : (
-                    <span className={cn('text-xs', deadlineStyles[deadline])}>
-                      {deadlineLabel(deadline)}
-                      {project.targetDate && deadline !== 'inactive' && (
-                        <span className="block text-text-dim font-normal">
-                          {formatTargetDate(project.targetDate)}
-                        </span>
-                      )}
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-1.5 text-sm text-text-muted">
-                  <span>{formatLastTouched(project.lastTouched)}</span>
-                  <SaveStatusChip id={project.id} />
-                </div>
-
-                <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
-                  {project.liveUrl ? (
-                    <a
-                      href={project.liveUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-text-muted hover:text-purple-light"
-                      aria-label={`Open live URL for ${project.name}`}
-                    >
-                      Live <ExternalLink size={12} aria-hidden />
-                    </a>
-                  ) : (
-                    <span className="text-xs text-text-dim">—</span>
-                  )}
+                    <span>{formatLastTouched(project.lastTouched)}</span>
+                    <SaveStatusChip id={project.id} />
+                  </div>
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    {project.liveUrl && (
+                      <a
+                        href={project.liveUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 hover:text-purple-light"
+                        aria-label={`Open live URL for ${project.name}`}
+                      >
+                        Live <ExternalLink size={11} aria-hidden />
+                      </a>
+                    )}
+                    {project.repoUrl && (
+                      <a
+                        href={project.repoUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 hover:text-purple-light"
+                        aria-label={`Open repo for ${project.name}`}
+                      >
+                        <Github size={11} aria-hidden /> Repo
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
             );
-          })
-        )}
-      </div>
+          })}
+        </div>
+      )}
     </div>
+  );
+}
+
+function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-1" role="group" aria-label={`Filter by ${label.toLowerCase()}`}>
+      <span className="text-[10px] uppercase tracking-wider text-text-dim mr-0.5">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function FilterChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors border',
+        active
+          ? 'bg-purple/20 text-purple-light border-purple/40'
+          : 'bg-surface-elevated text-text-dim border-transparent hover:text-text'
+      )}
+    >
+      {children}
+    </button>
   );
 }

@@ -18,13 +18,13 @@ import {
 } from 'lucide-react';
 
 const stages: { key: FilterStage; label: string; icon: ReactNode }[] = [
-  { key: 'All', label: 'Command', icon: <LayoutGrid size={16} /> },
-  { key: 'Exploring', label: 'Exploring', icon: <Compass size={16} /> },
-  { key: 'Building', label: 'Building', icon: <Hammer size={16} /> },
-  { key: 'Testing', label: 'Testing', icon: <TestTube2 size={16} /> },
-  { key: 'Live', label: 'Live', icon: <Rocket size={16} /> },
-  { key: 'Paused', label: 'Paused', icon: <PauseCircle size={16} /> },
-  { key: 'Archived', label: 'Archived', icon: <Archive size={16} /> },
+  { key: 'All', label: 'Command', icon: <LayoutGrid size={15} /> },
+  { key: 'Exploring', label: 'Exploring', icon: <Compass size={15} /> },
+  { key: 'Building', label: 'Building', icon: <Hammer size={15} /> },
+  { key: 'Testing', label: 'Testing', icon: <TestTube2 size={15} /> },
+  { key: 'Live', label: 'Live', icon: <Rocket size={15} /> },
+  { key: 'Paused', label: 'Paused', icon: <PauseCircle size={15} /> },
+  { key: 'Archived', label: 'Archived', icon: <Archive size={15} /> },
 ];
 
 export function Sidebar() {
@@ -43,25 +43,25 @@ export function Sidebar() {
   );
 
   return (
-    <aside className="w-60 flex-shrink-0 bg-surface/70 border-r border-border-subtle flex flex-col h-full backdrop-blur-sm">
-      <div className="px-4 py-5 flex items-center gap-2.5">
+    <aside className="w-56 flex-shrink-0 bg-surface/70 border-r border-border-subtle flex flex-col h-full backdrop-blur-sm">
+      <div className="px-3.5 py-4 flex items-center gap-2.5">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/logo.svg"
           alt="VibeOps"
-          width={32}
-          height={32}
-          className="w-8 h-8 rounded-lg flex-shrink-0"
+          width={28}
+          height={28}
+          className="w-7 h-7 rounded-full flex-shrink-0"
         />
-        <span className="font-semibold text-text tracking-tight">
+        <span className="font-semibold text-text tracking-tight text-[15px]">
           Vibe <span className="text-text-muted font-normal">/ Ops</span>
-          <span className="ml-1.5 text-[10px] font-medium uppercase tracking-wider text-purple-light bg-purple/15 px-1.5 py-0.5 rounded">
-            Cloud
-          </span>
+        </span>
+        <span className="text-[9px] font-medium uppercase tracking-wider text-purple-light bg-purple/15 px-1.5 py-0.5 rounded">
+          Cloud
         </span>
       </div>
 
-      <p className="px-5 pb-2 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-text-dim">
+      <p className="px-4 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-dim">
         Operate
       </p>
       <nav className="flex-1 px-2 space-y-0.5">
@@ -70,7 +70,7 @@ export function Sidebar() {
             key={s.key}
             onClick={() => setFilter(s.key)}
             className={cn(
-              'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors',
+              'w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors',
               filter === s.key
                 ? 'bg-purple/15 text-text font-medium'
                 : 'text-text-muted hover:bg-surface-elevated hover:text-text'
@@ -82,7 +82,7 @@ export function Sidebar() {
             <span className="flex-1 text-left">{s.label}</span>
             <span
               className={cn(
-                'text-[11px] tabular-nums rounded-full px-1.5 py-0.5',
+                'text-[10px] tabular-nums rounded-full px-1.5 py-0.5',
                 filter === s.key ? 'bg-purple/20 text-purple-light' : 'text-text-dim'
               )}
             >
@@ -92,9 +92,14 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <WorkspaceSwitcher />
-      <DigestPreference />
-      <BillingBadge />
+      <div className="border-t border-border-subtle pt-2">
+        <p className="px-4 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-dim">
+          Workspace
+        </p>
+        <WorkspaceSwitcher />
+        <DigestPreference />
+        <BillingBadge />
+      </div>
     </aside>
   );
 }
