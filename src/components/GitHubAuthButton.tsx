@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useClerk } from '@clerk/nextjs';
-import { clerkGitHubStrategy } from '@/src/lib/clerk-github';
 import type { OAuthStrategy } from '@clerk/types';
 
 function clerkError(cause: unknown): string {
@@ -14,6 +13,14 @@ function clerkError(cause: unknown): string {
   if (cause instanceof Error && cause.message) return cause.message;
   return 'Could not start GitHub sign-in.';
 }
+
+type SocialInfo = {
+  frontendApi?: string;
+  keyKind?: string;
+  strategies?: string[];
+  githubStrategy?: string | null;
+  error?: string;
+};
 
 export function GitHubAuthButton({ label = 'Continue with GitHub' }: { label?: string }) {
   const clerk = useClerk();
@@ -27,8 +34,19 @@ export function GitHubAuthButton({ label = 'Continue with GitHub' }: { label?: s
       const signIn = clerk.client?.signIn;
       if (!signIn) throw new Error('Clerk is still loading. Try again in a moment.');
 
+      const info = (await fetch('/api/auth/social').then((response) => response.json())) as SocialInfo;
+      if (info.error) throw new Error(info.error);
+
+      const strategy = info.githubStrategy;
+      if (!strategy) {
+        const allowed = info.strategies?.length ? info.strategies.join(', ') : 'none';
+        throw new Error(
+          `GitHub is not enabled for sign-in on the Clerk instance this site is using (${info.keyKind} · ${info.frontendApi}). Allowed social strategies: ${allowed}. Open that exact instance in the Clerk dashboard — Development if the key is pk_test, Production if it is pk_live — then SSO connections → Add connection → For all users → GitHub → Enable for sign-up and sign-in.`
+        );
+      }
+
       await signIn.authenticateWithRedirect({
-        strategy: clerkGitHubStrategy(clerk) as OAuthStrategy,
+        strategy: strategy as OAuthStrategy,
         redirectUrl: '/sso-callback',
         redirectUrlComplete: '/dashboard',
       });
