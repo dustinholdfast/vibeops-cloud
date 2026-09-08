@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { useProjectStore, MAX_NOW_SLOTS } from '../store/useProjectStore';
 import { format } from 'date-fns';
 import { Search, Plus, Download, Upload, Sun, Moon } from 'lucide-react';
 import { useTheme } from '../lib/useTheme';
 import type { Project } from '../types';
 
-export function Header() {
+export function Header({ account }: { account?: ReactNode }) {
   const {
     search,
     setSearch,
@@ -24,6 +24,7 @@ export function Header() {
   const [newName, setNewName] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === 'dark';
   useEffect(() => {
@@ -33,22 +34,23 @@ export function Header() {
     }
   }, [creation]);
 
-  const nowProjects = projects.filter((p) => p.priority === 'Now');
-  const nowCount = nowProjects.length;
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
-  let heading = 'Command center';
-  let sub =
-    'Every active project gets one unambiguous next action.';
-  if (nowCount === 0) {
-    sub = 'Nothing is claimed for today. Pick a Now slot and the rest gets quieter.';
-  } else if (nowCount === 1) {
-    heading = nowProjects[0].name;
-    sub = 'Claimed for today';
-  } else if (nowCount <= MAX_NOW_SLOTS) {
-    sub = `${nowCount} projects claimed for today`;
-  } else {
-    sub = `${nowCount} projects claimed (over the ${MAX_NOW_SLOTS}-slot soft limit)`;
-  }
+  const nowCount = projects.filter((p) => p.priority === 'Now').length;
+  let sub = 'Every active project gets one unambiguous next action.';
+  if (nowCount === 0) sub = 'Nothing claimed for today.';
+  else if (nowCount === 1) sub = '1 project claimed for today';
+  else if (nowCount <= MAX_NOW_SLOTS) sub = `${nowCount} projects claimed for today`;
+  else sub = `${nowCount} claimed · over the ${MAX_NOW_SLOTS}-slot soft limit`;
 
   const handleAdd = async () => {
     if (!newName.trim() || creating || operationBusy) return;
@@ -60,9 +62,7 @@ export function Header() {
 
   const handleExport = () => {
     const payload = getExportPayload();
-    const blob = new Blob([JSON.stringify(payload, null, 2)], {
-      type: 'application/json',
-    });
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -71,14 +71,9 @@ export function Header() {
     URL.revokeObjectURL(url);
   };
 
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
-
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onerror = () => reportError('Could not read that file. Try selecting it again.');
     reader.onload = async () => {
@@ -88,20 +83,14 @@ export function Header() {
         if (Array.isArray(raw)) list = raw;
         else if (raw && Array.isArray(raw.projects)) list = raw.projects;
         else {
-          reportError(
-            'That file is not a VibeOps export: expected an array of projects or { projects: [...] }.'
-          );
+          reportError('That file is not a VibeOps export: expected an array of projects or { projects: [...] }.');
           return;
         }
       } catch {
         reportError('Could not parse that file as JSON. Your workspace is unchanged.');
         return;
       }
-      if (
-        !confirm(
-          `Import ${list.length} project${list.length === 1 ? '' : 's'}? This will replace your current data.`
-        )
-      ) {
+      if (!confirm(`Import ${list.length} project${list.length === 1 ? '' : 's'}? This will replace your current data.`)) {
         return;
       }
       await importProjects(list);
@@ -111,116 +100,80 @@ export function Header() {
   };
 
   return (
-    <div className="mb-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <p className="text-xs font-medium tracking-wider text-text-dim uppercase">
-            {format(new Date(), 'EEEE, MMMM d').toUpperCase()}
-          </p>
-          <h1 className="text-2xl font-semibold text-text mt-1 tracking-tight">{heading}</h1>
-          <p className="text-sm text-text-muted mt-1 max-w-md">{sub}</p>
+    <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
+      <div className="min-w-0">
+        <p className="text-[11px] font-medium tracking-wider text-text-dim uppercase">
+          {format(new Date(), 'EEEE, MMMM d')}
+        </p>
+        <h1 className="text-xl font-semibold text-text tracking-tight">Command center</h1>
+        <p className="text-sm text-text-muted truncate">{sub}</p>
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-dim" />
+          <input
+            ref={searchRef}
+            type="text"
+            placeholder="Search projects"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-52 pl-9 pr-12 py-2 rounded-lg bg-surface border border-border text-sm text-text placeholder:text-text-dim focus:outline-none focus:border-purple/50 focus:ring-1 focus:ring-purple/30"
+          />
+          <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 hidden sm:inline text-[10px] text-text-dim border border-border rounded px-1.5 py-0.5">
+            ⌘K
+          </kbd>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={toggleTheme}
-            aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
-            aria-pressed={isDark}
-            title={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
-            className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-surface border border-border text-text-muted hover:text-text transition-colors"
-          >
-            {isDark ? <Sun size={16} /> : <Moon size={16} />}
-          </button>
+        <button
+          type="button"
+          onClick={toggleTheme}
+          aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
+          aria-pressed={isDark}
+          className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-surface border border-border text-text-muted hover:text-text"
+        >
+          {isDark ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
 
-          <div className="relative">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-dim" />
+        <button type="button" onClick={handleExport} title="Export projects as JSON" className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-surface border border-border text-text-muted hover:text-text">
+          <Download size={15} />
+        </button>
+        <button type="button" onClick={() => fileInputRef.current?.click()} disabled={operationBusy || creating} title="Import projects from JSON" className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-surface border border-border text-text-muted hover:text-text disabled:opacity-40">
+          <Upload size={15} />
+        </button>
+        <input ref={fileInputRef} type="file" accept="application/json,.json" className="hidden" onChange={handleImportFile} />
+
+        {showAdd ? (
+          <div className="flex items-center gap-2">
             <input
+              autoFocus
               type="text"
-              placeholder="Search projects"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-52 pl-9 pr-12 py-2 rounded-lg bg-surface border border-border text-sm text-text placeholder:text-text-dim focus:outline-none focus:border-purple/50 focus:ring-1 focus:ring-purple/30"
-            />
-            <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 hidden sm:inline text-[10px] text-text-dim border border-border rounded px-1.5 py-0.5">
-              ⌘K
-            </kbd>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleExport}
-            className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-surface border border-border text-text-muted hover:text-text text-sm transition-colors"
-            title="Export projects as JSON"
-          >
-            <Download size={15} />
-            <span className="hidden sm:inline">Export</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleImportClick}
-            disabled={operationBusy || creating}
-            className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-surface border border-border text-text-muted hover:text-text text-sm transition-colors"
-            title="Import projects from JSON"
-          >
-            <Upload size={15} />
-            <span className="hidden sm:inline">Import</span>
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="application/json,.json"
-            className="hidden"
-            onChange={handleImportFile}
-          />
-
-          {showAdd ? (
-            <div className="flex items-center gap-2">
-              <input
-                autoFocus
-                type="text"
-                placeholder="New project name…"
-                value={newName}
-                disabled={creating || Boolean(creation)}
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleAdd();
-                  if (e.key === 'Escape' && !creating) {
-                    cancelCreation();
-                    setShowAdd(false);
-                  }
-                }}
-                className="w-48 px-3 py-2 rounded-lg bg-surface border border-border text-sm text-text placeholder:text-text-dim focus:outline-none focus:border-purple/50"
-              />
-              <button
-                onClick={handleAdd}
-                disabled={creating || operationBusy}
-                className="px-3 py-2 rounded-lg bg-purple hover:bg-purple-light text-white text-sm font-medium transition-colors"
-              >
-                {creating ? 'Saving…' : creation ? 'Retry' : 'Add'}
-              </button>
-              <button
-                disabled={creating}
-                onClick={() => {
+              placeholder="New project name…"
+              value={newName}
+              disabled={creating || Boolean(creation)}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleAdd();
+                if (e.key === 'Escape' && !creating) {
                   cancelCreation();
                   setShowAdd(false);
-                }}
-                className="px-2 py-2 text-text-dim hover:text-text text-sm"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowAdd(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-purple hover:bg-purple-light text-white text-sm font-medium transition-colors"
-            >
-              <Plus size={16} />
-              Add
+                }
+              }}
+              className="w-44 px-3 py-2 rounded-lg bg-surface border border-border text-sm text-text placeholder:text-text-dim focus:outline-none focus:border-purple/50"
+            />
+            <button onClick={handleAdd} disabled={creating || operationBusy} className="px-3 py-2 rounded-lg bg-purple hover:bg-purple-light text-white text-sm font-medium">
+              {creating ? 'Saving…' : creation ? 'Retry' : 'Add'}
             </button>
-          )}
-        </div>
+            <button disabled={creating} onClick={() => { cancelCreation(); setShowAdd(false); }} className="px-2 py-2 text-text-dim hover:text-text text-sm">
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-purple hover:bg-purple-light text-white text-sm font-medium">
+            <Plus size={16} /> Add
+          </button>
+        )}
+        {account}
       </div>
     </div>
   );
