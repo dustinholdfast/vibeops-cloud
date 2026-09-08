@@ -9,8 +9,7 @@ import { ProjectList } from '@/src/components/ProjectList';
 import { ProjectDrawer } from '@/src/components/ProjectDrawer';
 import { useProjectStore } from '@/src/store/useProjectStore';
 import { WorkspaceSaveNotice } from '@/src/components/SaveStatus';
-import { DailyBrief } from '@/src/components/DailyBrief';
-import { WeeklyReview } from '@/src/components/WeeklyReview';
+import { IntelligenceBand } from '@/src/components/IntelligenceBand';
 import { EmptyWorkspace } from '@/src/components/EmptyWorkspace';
 
 export function DashboardClient({ userId }: { userId: string }) {
@@ -75,9 +74,8 @@ export function DashboardClient({ userId }: { userId: string }) {
                 <EmptyWorkspace />
               ) : (
                 <>
-                  <DailyBrief />
+                  <IntelligenceBand />
                   <StatusCards />
-                  <WeeklyReview />
                   <ProjectList />
                 </>
               )}
