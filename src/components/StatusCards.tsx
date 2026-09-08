@@ -10,7 +10,7 @@ function pad(n: number) {
 }
 
 export function StatusCards() {
-  const { projects, openDrawer, setFilter, setHealthFilter, setDeadlineFilter } =
+  const { projects, openDrawer, setFilter, setHealthFilter, setDeadlineFilter, setPriority } =
     useProjectStore();
   const drafts = useProjectStore((s) => s.drafts);
   const saving = Object.values(drafts).some((d) => d.status === 'saving');
@@ -32,10 +32,11 @@ export function StatusCards() {
   };
 
   const overNowLimit = nowProjects.length > MAX_NOW_SLOTS;
-
-  const overdue = projects.filter(
-    (p) => getDeadlineState(p.targetDate, p.stage) === 'overdue'
+  const claimable = projects.filter(
+    (p) => p.priority !== 'Now' && p.stage !== 'Archived' && p.stage !== 'Paused'
   );
+
+  const overdue = projects.filter((p) => getDeadlineState(p.targetDate, p.stage) === 'overdue');
   const blocked = projects.filter((p) => p.health === 'Blocked');
   const atRisk = projects.filter((p) => p.health === 'At risk');
 
@@ -88,6 +89,7 @@ export function StatusCards() {
   ].filter((item) => item.count > 0);
 
   const totalAttention = attentionItems.reduce((sum, i) => sum + i.count, 0);
+  const emptyCount = Math.max(0, MAX_NOW_SLOTS - nowProjects.length);
 
   return (
     <div className="space-y-5">
@@ -146,7 +148,6 @@ export function StatusCards() {
                 <span className="rounded-full bg-purple/15 px-2 py-0.5 text-[11px] text-purple-light">Now</span>
               </div>
               <p className="font-semibold text-text">{p.name}</p>
-              <p className="mt-1 text-sm text-text-muted line-clamp-2">{p.nextAction || 'No next action yet.'}</p>
               <div className="mt-3 h-1 rounded-full bg-border-subtle overflow-hidden">
                 <div className="h-full rounded-full bg-gradient-to-r from-purple to-blue" style={{ width: `${p.progress}%` }} />
               </div>
@@ -154,15 +155,28 @@ export function StatusCards() {
               <p className="text-sm text-text truncate">{p.nextAction || '—'}</p>
             </button>
           ))}
-          {nowProjects.length < MAX_NOW_SLOTS &&
-            Array.from({ length: MAX_NOW_SLOTS - nowProjects.length }).map((_, i) => (
+          {Array.from({ length: emptyCount }).map((_, i) => {
+            const suggestion = claimable[i];
+            return (
               <div
                 key={`empty-${i}`}
-                className="rounded-2xl border border-dashed border-border bg-transparent p-4 min-h-[168px] flex items-center justify-center text-sm text-text-dim"
+                className="rounded-2xl border border-dashed border-border min-h-[168px] p-4 flex flex-col items-center justify-center text-center"
               >
-                Open slot
+                <p className="text-sm text-text-dim">Open slot</p>
+                {suggestion ? (
+                  <button
+                    type="button"
+                    onClick={() => setPriority(suggestion.id, 'Now')}
+                    className="mt-2 max-w-full truncate rounded-lg bg-purple/15 px-3 py-1.5 text-xs font-medium text-purple-light hover:bg-purple/25"
+                  >
+                    Claim {suggestion.name}
+                  </button>
+                ) : (
+                  <p className="mt-1 text-xs text-text-dim">Mark a project Now to fill this.</p>
+                )}
               </div>
-            ))}
+            );
+          })}
         </div>
       </div>
 
@@ -174,9 +188,7 @@ export function StatusCards() {
               <div key={item.label} className="min-w-[140px]">
                 <button type="button" onClick={item.filterAction} className="text-left group" aria-label={`Filter to ${item.count} ${item.label} projects`}>
                   <span className="text-xs text-text-dim group-hover:text-text">{item.label}</span>
-                  <div className="flex items-baseline gap-1.5 mt-0.5">
-                    <span className="text-xl font-semibold tabular-nums text-text">{item.count}</span>
-                  </div>
+                  <div className="mt-0.5 text-xl font-semibold tabular-nums text-text">{item.count}</div>
                 </button>
                 <div className="mt-1 flex flex-wrap gap-1">
                   {item.projects.slice(0, 3).map((p) => (
