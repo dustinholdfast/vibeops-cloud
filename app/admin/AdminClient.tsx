@@ -13,8 +13,6 @@ import {
   Shield,
   Sun,
   Moon,
-  Users,
-  X,
 } from 'lucide-react';
 import { useTheme } from '@/src/lib/useTheme';
 
@@ -131,8 +129,6 @@ export function AdminClient() {
     });
   }, [accounts, query, filter]);
 
-  const selected = filtered.find((account) => account.userId === selectedId) ?? null;
-
   const setPlan = async (userId: string, plan: 'free' | 'pro', cancelStripe = false) => {
     setBusyId(userId);
     try {
@@ -148,6 +144,37 @@ export function AdminClient() {
         return;
       }
       showToast(plan === 'pro' ? 'Pro granted' : cancelStripe ? 'Stripe canceled, set Free' : 'Set to Free');
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const deleteUser = async (account: Account) => {
+    const label = account.email ?? account.userId;
+    const owned = account.ownedWorkspaces.length;
+    if (
+      !confirm(
+        `Delete ${label}? This removes their Clerk login, ${owned} owned workspace${owned === 1 ? '' : 's'}, projects, memberships, and billing row. It cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    setBusyId(account.userId);
+    try {
+      const res = await fetch('/api/admin/accounts', {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: account.userId }),
+      });
+      const body = await readBody(res);
+      if (!res.ok) {
+        showToast(body.error || 'Could not delete user');
+        return;
+      }
+      setSelectedId(null);
+      showToast(`Deleted ${label}`);
       await load();
     } finally {
       setBusyId(null);
@@ -210,10 +237,10 @@ export function AdminClient() {
         ) : (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-              <Metric label="Accounts" value={accounts === null ? '—' : String(stats.total).padStart(2, '0')} hint="Known owners and members" />
-              <Metric label="Pro" value={accounts === null ? '—' : String(stats.pro).padStart(2, '0')} hint="Paid or complimentary" tone="text-purple-light" />
-              <Metric label="Complimentary" value={accounts === null ? '—' : String(stats.complimentary).padStart(2, '0')} hint="Granted in this console" />
-              <Metric label="Stripe live" value={accounts === null ? '—' : String(stats.stripe).padStart(2, '0')} hint="Has a subscription id" />
+              <Metric label="Accounts" value={accounts === null ? '\u2014' : String(stats.total).padStart(2, '0')} hint="Known owners and members" />
+              <Metric label="Pro" value={accounts === null ? '\u2014' : String(stats.pro).padStart(2, '0')} hint="Paid or complimentary" tone="text-purple-light" />
+              <Metric label="Complimentary" value={accounts === null ? '\u2014' : String(stats.complimentary).padStart(2, '0')} hint="Granted in this console" />
+              <Metric label="Stripe live" value={accounts === null ? '\u2014' : String(stats.stripe).padStart(2, '0')} hint="Has a subscription id" />
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -404,6 +431,14 @@ export function AdminClient() {
                                 Cancel Stripe
                               </button>
                             )}
+                            <button
+                              type="button"
+                              disabled={busyId === account.userId}
+                              onClick={() => void deleteUser(account)}
+                              className="rounded-lg border border-danger/40 px-3 py-2 text-xs text-danger disabled:opacity-40"
+                            >
+                              Delete user
+                            </button>
                           </div>
                         </div>
                       )}
@@ -417,15 +452,9 @@ export function AdminClient() {
       </main>
 
       {toast && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 rounded-full border border-border bg-surface-elevated px-4 py-2 text-sm text-text shadow-lg">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 rounded-full border border-border bg-surface-elevated px-4 py-2 text-sm shadow-lg">
           {toast}
         </div>
-      )}
-
-      {selected && (
-        <button type="button" className="sr-only" onClick={() => setSelectedId(null)}>
-          <X size={12} /> Close
-        </button>
       )}
     </div>
   );
@@ -443,18 +472,20 @@ function Metric({
   tone?: string;
 }) {
   return (
-    <article className="rounded-2xl border border-border bg-surface p-4">
-      <p className="text-xs text-text-muted">{label}</p>
-      <p className={`mt-2 text-3xl font-semibold tabular-nums tracking-tight ${tone ?? 'text-text'}`}>{value}</p>
-      <p className="mt-2 text-xs text-text-dim">{hint}</p>
-    </article>
+    <div className="rounded-2xl border border-border bg-surface px-4 py-3">
+      <p className="text-[11px] uppercase tracking-wider text-text-dim">{label}</p>
+      <p className={`mt-1 text-2xl font-semibold tabular-nums ${tone ?? 'text-text'}`}>{value}</p>
+      <p className="mt-0.5 text-xs text-text-dim">{hint}</p>
+    </div>
   );
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex gap-3 text-xs">
-      <span className="w-20 flex-shrink-0 text-text-dim">{label}</span>
+    <div className="flex items-start gap-3">
+      <span className="w-20 flex-shrink-0 pt-0.5 text-[11px] uppercase tracking-wider text-text-dim">
+        {label}
+      </span>
       <div className="min-w-0 text-text">{children}</div>
     </div>
   );
