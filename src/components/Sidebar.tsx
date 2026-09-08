@@ -25,7 +25,13 @@ const stages: { key: FilterStage; label: string; icon: ReactNode }[] = [
   { key: 'Archived', label: 'Archived', icon: <Archive size={15} /> },
 ];
 
-export function Sidebar() {
+export function Sidebar({
+  mobileOpen = false,
+  onClose,
+}: {
+  mobileOpen?: boolean;
+  onClose?: () => void;
+}) {
   const { projects, filter, setFilter } = useProjectStore();
 
   const counts = projects.reduce(
@@ -41,61 +47,81 @@ export function Sidebar() {
   );
 
   return (
-    <aside className="w-56 flex-shrink-0 bg-surface/70 border-r border-border-subtle flex flex-col h-full backdrop-blur-sm">
-      <div className="px-3.5 py-4 flex items-center gap-2.5">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/logo.svg"
-          alt="VibeOps"
-          width={28}
-          height={28}
-          className="w-7 h-7 rounded-full flex-shrink-0"
-        />
-        <span className="font-semibold text-text tracking-tight text-[15px]">
-          Vibe <span className="text-text-muted font-normal">/ Ops</span>
-        </span>
-        <span className="text-[9px] font-medium uppercase tracking-wider text-purple-light bg-purple/15 px-1.5 py-0.5 rounded">
-          Cloud
-        </span>
-      </div>
+    <>
+      <button
+        type="button"
+        aria-label="Close navigation"
+        onClick={onClose}
+        className={cn(
+          'fixed inset-0 z-40 bg-black/50 lg:hidden',
+          mobileOpen ? 'block' : 'hidden'
+        )}
+      />
+      <aside
+        className={cn(
+          'w-56 flex-shrink-0 bg-surface/95 border-r border-border-subtle flex flex-col h-full backdrop-blur-sm',
+          'max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50 max-lg:shadow-2xl max-lg:transition-transform max-lg:duration-200',
+          mobileOpen ? 'max-lg:translate-x-0' : 'max-lg:-translate-x-full'
+        )}
+      >
+        <div className="px-3.5 py-4 flex items-center gap-2.5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo.svg"
+            alt="VibeOps"
+            width={28}
+            height={28}
+            className="w-7 h-7 rounded-full flex-shrink-0"
+          />
+          <span className="font-semibold text-text tracking-tight text-[15px]">
+            Vibe <span className="text-text-muted font-normal">/ Ops</span>
+          </span>
+          <span className="text-[9px] font-medium uppercase tracking-wider text-purple-light bg-purple/15 px-1.5 py-0.5 rounded">
+            Cloud
+          </span>
+        </div>
 
-      <p className="px-4 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-dim">
-        Operate
-      </p>
-      <nav className="flex-1 px-2 space-y-0.5">
-        {stages.map((s) => (
-          <button
-            key={s.key}
-            onClick={() => setFilter(s.key)}
-            className={cn(
-              'w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors',
-              filter === s.key
-                ? 'bg-purple/15 text-text font-medium'
-                : 'text-text-muted hover:bg-surface-elevated hover:text-text'
-            )}
-          >
-            <span className={cn(filter === s.key ? 'text-purple-light' : 'text-text-dim')}>
-              {s.icon}
-            </span>
-            <span className="flex-1 text-left">{s.label}</span>
-            <span
+        <p className="px-4 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-dim">
+          Operate
+        </p>
+        <nav className="flex-1 px-2 space-y-0.5 overflow-y-auto">
+          {stages.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => {
+                setFilter(s.key);
+                onClose?.();
+              }}
               className={cn(
-                'text-[10px] tabular-nums rounded-full px-1.5 py-0.5',
-                filter === s.key ? 'bg-purple/20 text-purple-light' : 'text-text-dim'
+                'w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors',
+                filter === s.key
+                  ? 'bg-purple/15 text-text font-medium'
+                  : 'text-text-muted hover:bg-surface-elevated hover:text-text'
               )}
             >
-              {counts[s.key]}
-            </span>
-          </button>
-        ))}
-      </nav>
+              <span className={cn(filter === s.key ? 'text-purple-light' : 'text-text-dim')}>
+                {s.icon}
+              </span>
+              <span className="flex-1 text-left">{s.label}</span>
+              <span
+                className={cn(
+                  'text-[10px] tabular-nums rounded-full px-1.5 py-0.5',
+                  filter === s.key ? 'bg-purple/20 text-purple-light' : 'text-text-dim'
+                )}
+              >
+                {counts[s.key]}
+              </span>
+            </button>
+          ))}
+        </nav>
 
-      <div className="border-t border-border-subtle pt-2">
-        <p className="px-4 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-dim">
-          Workspace
-        </p>
-        <WorkspaceMenu />
-      </div>
-    </aside>
+        <div className="border-t border-border-subtle pt-2">
+          <p className="px-4 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-dim">
+            Workspace
+          </p>
+          <WorkspaceMenu />
+        </div>
+      </aside>
+    </>
   );
 }
