@@ -4,10 +4,7 @@ import type { ReactNode } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
 import type { FilterStage } from '../types';
 import { cn } from '../lib/utils';
-import { BillingBadge } from './BillingBadge';
-import { WorkspaceSwitcher } from './WorkspaceSwitcher';
-import { DigestPreference } from './DigestPreference';
-import { AdminLink } from './AdminLink';
+import { WorkspaceMenu } from './WorkspaceMenu';
 import {
   LayoutGrid,
   Compass,
@@ -97,10 +94,7 @@ export function Sidebar() {
         <p className="px-4 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-dim">
           Workspace
         </p>
-        <WorkspaceSwitcher />
-        <DigestPreference />
-        <AdminLink />
-        <BillingBadge />
+        <WorkspaceMenu />
       </div>
     </aside>
   );
