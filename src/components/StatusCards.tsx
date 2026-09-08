@@ -5,6 +5,10 @@ import { differenceInDays } from 'date-fns';
 import { cn, getDeadlineState } from '../lib/utils';
 import type { Project } from '../types';
 
+function pad(n: number) {
+  return String(n).padStart(2, '0');
+}
+
 export function StatusCards() {
   const { projects, openDrawer, setFilter, setHealthFilter, setDeadlineFilter } =
     useProjectStore();
@@ -18,8 +22,7 @@ export function StatusCards() {
   });
 
   const inFlight = projects.filter(
-    (p) =>
-      p.stage === 'Exploring' || p.stage === 'Building' || p.stage === 'Testing'
+    (p) => p.stage === 'Exploring' || p.stage === 'Building' || p.stage === 'Testing'
   );
 
   const stageCounts = {
@@ -35,7 +38,6 @@ export function StatusCards() {
   );
   const blocked = projects.filter((p) => p.health === 'Blocked');
   const atRisk = projects.filter((p) => p.health === 'At risk');
-  const stale = rotting;
 
   const attentionItems: {
     label: string;
@@ -75,8 +77,8 @@ export function StatusCards() {
     },
     {
       label: 'Stale (7+ days)',
-      count: stale.length,
-      projects: stale,
+      count: rotting.length,
+      projects: rotting,
       filterAction: () => {
         setFilter('All');
         setHealthFilter('All');
@@ -88,200 +90,106 @@ export function StatusCards() {
   const totalAttention = attentionItems.reduce((sum, i) => sum + i.count, 0);
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div
-          className={cn(
-            'rounded-xl border p-4 transition-all',
-            nowProjects.length > 0
-              ? overNowLimit
-                ? 'border-warning/50 bg-warning/5'
-                : 'border-purple/50 bg-purple/5 shadow-[0_0_20px_-5px_rgba(139,124,246,0.3)]'
-              : 'border-border bg-surface'
-          )}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xs font-semibold tracking-wider text-purple-light uppercase">
-              Work on this now
-            </h3>
-            <span
-              className={cn(
-                'text-xs tabular-nums',
-                overNowLimit ? 'text-warning font-medium' : 'text-text-dim'
-              )}
-            >
-              {nowProjects.length} / {MAX_NOW_SLOTS} now slots
-              {overNowLimit && ' · over limit'}
-            </span>
-          </div>
-
-          {nowProjects.length === 0 ? (
-            <div className="py-2">
-              <p className="text-sm text-text-muted">
-                No project is marked{' '}
-                <span className="text-purple-light font-medium">Now</span>.
-              </p>
-              <p className="text-sm text-text-dim mt-1">
-                Pick one and everything else gets quieter.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {nowProjects.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => openDrawer(p.id)}
-                  className="w-full text-left group"
-                >
-                  <p className="text-base font-semibold text-text group-hover:text-purple-light transition-colors">
-                    {p.name}
-                  </p>
-                  <p className="text-sm text-text-muted mt-0.5 truncate">{p.nextAction}</p>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 text-xs text-text-dim">
-                      <span
-                        className={cn(
-                          'w-1.5 h-1.5 rounded-full',
-                          p.stage === 'Testing' && 'bg-orange',
-                          p.stage === 'Exploring' && 'bg-blue',
-                          p.stage === 'Building' && 'bg-purple',
-                          p.stage === 'Live' && 'bg-success',
-                          (p.stage === 'Paused' || p.stage === 'Archived') && 'bg-text-dim'
-                        )}
-                      />
-                      {p.stage}
-                    </span>
-                  </div>
-                </button>
-              ))}
-              {overNowLimit && (
-                <p className="text-xs text-warning mt-1">
-                  Soft limit is {MAX_NOW_SLOTS}. Consider demoting some to Next.
-                </p>
-              )}
-              {!overNowLimit && nowProjects.length > 0 && (
-                <p className="text-xs text-text-dim mt-1">Everything else is quieter.</p>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-xl border border-border bg-surface p-4">
-          <h3 className="text-xs font-semibold tracking-wider text-text-muted uppercase mb-3">
-            Rotting
-          </h3>
-          <div className="flex items-baseline gap-2">
-            <span className="text-4xl font-bold tabular-nums text-text">
-              {String(rotting.length).padStart(2, '0')}
-            </span>
-          </div>
-          <p className="text-sm text-text-dim mt-1">
-            {rotting.length === 0 ? 'No rotting projects' : 'untouched 7+ days'}
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <article className="rounded-2xl border border-border bg-surface p-4">
+          <p className="text-xs text-text-muted">Work on this Now</p>
+          <p className={cn('mt-2 text-3xl font-semibold tabular-nums tracking-tight', overNowLimit ? 'text-warning' : 'text-purple-light')}>
+            {pad(nowProjects.length)}
           </p>
+          <p className="mt-2 text-xs text-text-dim">
+            {overNowLimit ? `Over the ${MAX_NOW_SLOTS}-slot soft cap` : `Soft cap of ${MAX_NOW_SLOTS}`}
+          </p>
+        </article>
+        <article className="rounded-2xl border border-border bg-surface p-4">
+          <p className="text-xs text-text-muted">Needs attention</p>
+          <p className={cn('mt-2 text-3xl font-semibold tabular-nums tracking-tight', totalAttention > 0 ? 'text-warning' : 'text-text')}>
+            {pad(totalAttention)}
+          </p>
+          <p className="mt-2 text-xs text-text-dim">
+            {totalAttention === 0 ? 'All clear' : 'Overdue, blocked, at risk, or stale'}
+          </p>
+        </article>
+        <article className="rounded-2xl border border-border bg-surface p-4">
+          <p className="text-xs text-text-muted">In flight</p>
+          <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-text">{pad(inFlight.length)}</p>
+          <p className="mt-2 text-xs text-text-dim">
+            {stageCounts.Exploring} exploring · {stageCounts.Building} building · {stageCounts.Testing} testing
+          </p>
+        </article>
+        <article className="rounded-2xl border border-border bg-surface p-4">
+          <p className="text-xs text-text-muted">Workspace</p>
+          <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-success">
+            {saving ? '…' : 'OK'}
+          </p>
+          <p className="mt-2 text-xs text-text-dim">{saving ? 'Saving changes' : Object.keys(drafts).length ? 'Unsaved drafts' : 'Synced'}</p>
+        </article>
+      </div>
+
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-medium text-text">Now slots</h3>
+          <p className="text-xs text-text-dim">{nowProjects.length} / {MAX_NOW_SLOTS}</p>
         </div>
-
-        <div className="rounded-xl border border-border bg-surface p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xs font-semibold tracking-wider text-text-muted uppercase">
-              In flight
-            </h3>
-            <span className="text-xs text-text-dim" role="status">{saving ? 'Saving…' : Object.keys(drafts).length ? 'Unsaved changes' : 'Saved'}</span>
-          </div>
-          <div className="flex items-baseline gap-2 mb-3">
-            <span className="text-4xl font-bold tabular-nums text-text">
-              {String(inFlight.length).padStart(2, '0')}
-            </span>
-            <span className="text-sm text-text-dim">active builds</span>
-          </div>
-
-          <div className="space-y-2">
-            {(
-              [
-                { label: 'Exploring', count: stageCounts.Exploring, color: 'bg-purple' },
-                { label: 'Building', count: stageCounts.Building, color: 'bg-blue' },
-                { label: 'Testing', count: stageCounts.Testing, color: 'bg-orange' },
-              ] as const
-            ).map((row) => (
-              <div key={row.label} className="flex items-center gap-2 text-xs">
-                <span className="w-16 text-text-dim">{row.label}</span>
-                <div className="flex-1 h-1.5 bg-border-subtle rounded-full overflow-hidden">
-                  <div
-                    className={cn('h-full rounded-full transition-all', row.color)}
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        (row.count / Math.max(1, inFlight.length)) * 100
-                      )}%`,
-                    }}
-                  />
-                </div>
-                <span className="w-4 text-right tabular-nums text-text-muted">
-                  {row.count}
-                </span>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {nowProjects.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => openDrawer(p.id)}
+              className="relative overflow-hidden text-left rounded-2xl border border-border bg-surface p-4 hover:border-purple/40 transition-colors"
+            >
+              <span className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-purple to-blue" />
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                <span className="rounded-full bg-surface-elevated px-2 py-0.5 text-[11px] text-text-muted">{p.stage}</span>
+                <span className="rounded-full bg-surface-elevated px-2 py-0.5 text-[11px] text-text-muted">{p.health}</span>
+                <span className="rounded-full bg-purple/15 px-2 py-0.5 text-[11px] text-purple-light">Now</span>
+              </div>
+              <p className="font-semibold text-text">{p.name}</p>
+              <p className="mt-1 text-sm text-text-muted line-clamp-2">{p.nextAction || 'No next action yet.'}</p>
+              <div className="mt-3 h-1 rounded-full bg-border-subtle overflow-hidden">
+                <div className="h-full rounded-full bg-gradient-to-r from-purple to-blue" style={{ width: `${p.progress}%` }} />
+              </div>
+              <p className="mt-3 text-[11px] uppercase tracking-wider text-text-dim">Next action</p>
+              <p className="text-sm text-text truncate">{p.nextAction || '—'}</p>
+            </button>
+          ))}
+          {nowProjects.length < MAX_NOW_SLOTS &&
+            Array.from({ length: MAX_NOW_SLOTS - nowProjects.length }).map((_, i) => (
+              <div
+                key={`empty-${i}`}
+                className="rounded-2xl border border-dashed border-border bg-transparent p-4 min-h-[168px] flex items-center justify-center text-sm text-text-dim"
+              >
+                Open slot
               </div>
             ))}
-          </div>
         </div>
       </div>
 
-      <div className="rounded-xl border border-border bg-surface p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-semibold tracking-wider text-text-muted uppercase">
-            Needs attention
-          </h3>
-          {totalAttention > 0 && (
-            <span className="text-xs tabular-nums text-text-dim">
-              {totalAttention} signal{totalAttention === 1 ? '' : 's'}
-            </span>
-          )}
-        </div>
-
-        {totalAttention === 0 ? (
-          <p className="text-sm text-text-muted py-1">
-            All clear — no overdue, blocked, or at-risk projects.
-          </p>
-        ) : (
+      {totalAttention > 0 && (
+        <div className="rounded-2xl border border-border bg-surface p-4">
+          <h3 className="text-xs font-semibold tracking-wider text-text-muted uppercase mb-3">Needs attention</h3>
           <div className="flex flex-wrap gap-x-6 gap-y-3">
             {attentionItems.map((item) => (
               <div key={item.label} className="min-w-[140px]">
-                <button
-                  type="button"
-                  onClick={item.filterAction}
-                  className="text-left group"
-                  aria-label={`Filter to ${item.count} ${item.label} projects`}
-                >
-                  <span className="text-xs text-text-dim group-hover:text-text">
-                    {item.label}
-                  </span>
+                <button type="button" onClick={item.filterAction} className="text-left group" aria-label={`Filter to ${item.count} ${item.label} projects`}>
+                  <span className="text-xs text-text-dim group-hover:text-text">{item.label}</span>
                   <div className="flex items-baseline gap-1.5 mt-0.5">
-                    <span className="text-xl font-semibold tabular-nums text-text">
-                      {item.count}
-                    </span>
+                    <span className="text-xl font-semibold tabular-nums text-text">{item.count}</span>
                   </div>
                 </button>
                 <div className="mt-1 flex flex-wrap gap-1">
                   {item.projects.slice(0, 3).map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => openDrawer(p.id)}
-                      className="text-xs text-purple-light hover:underline"
-                    >
+                    <button key={p.id} type="button" onClick={() => openDrawer(p.id)} className="text-xs text-purple-light hover:underline">
                       {p.name}
                     </button>
                   ))}
-                  {item.projects.length > 3 && (
-                    <span className="text-xs text-text-dim">
-                      +{item.projects.length - 3}
-                    </span>
-                  )}
                 </div>
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
