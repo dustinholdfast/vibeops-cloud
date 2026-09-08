@@ -8,10 +8,10 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-full flex flex-col items-center justify-center px-6">
-      <div className="max-w-lg w-full text-center space-y-8">
+      <div className="max-w-xl w-full text-center space-y-8">
         <div className="flex items-center justify-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="VibeOps" width={48} height={48} className="rounded-xl" />
+          <img src="/logo.svg" alt="VibeOps" width={48} height={48} className="rounded-xl shadow-[0_8px_20px_-8px_rgba(139,124,255,0.8)]" />
           <span className="text-2xl font-semibold tracking-tight">
             Vibe <span className="text-text-muted font-normal">/ Ops</span>{' '}
             <span className="text-sm font-medium uppercase tracking-wider text-purple-light bg-purple/15 px-2 py-0.5 rounded ml-1">
@@ -21,7 +21,7 @@ export default async function HomePage() {
         </div>
 
         <div className="space-y-3">
-          <h1 className="text-3xl font-semibold tracking-tight text-text">
+          <h1 className="text-4xl font-semibold tracking-tight text-text">
             Your projects, synced.
           </h1>
           <p className="text-text-muted text-base leading-relaxed">
@@ -33,32 +33,24 @@ export default async function HomePage() {
         <div className="flex items-center justify-center gap-3 flex-wrap">
           <Link
             href="/sign-in"
-            className="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-purple hover:bg-purple-light text-white text-sm font-medium transition-colors"
+            className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-purple hover:bg-purple-light text-white text-sm font-semibold shadow-[0_10px_24px_-12px_rgba(139,124,255,0.9)] transition-colors"
           >
             Sign in
           </Link>
           <Link
             href="/sign-up"
-            className="inline-flex items-center justify-center px-5 py-2.5 rounded-lg border border-border bg-surface text-text text-sm font-medium hover:bg-surface-elevated transition-colors"
+            className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl border border-border bg-surface text-text text-sm font-medium hover:bg-surface-elevated transition-colors"
           >
             Create account
           </Link>
-          <Link
-            href="/pricing"
-            className="inline-flex items-center justify-center px-5 py-2.5 rounded-lg text-sm font-medium text-purple-light hover:underline"
-          >
+          <Link href="/pricing" className="text-sm font-medium text-purple-light hover:underline">
             Pricing
           </Link>
         </div>
 
         <p className="text-xs text-text-dim">
           Prefer offline? Use{' '}
-          <a
-            href="https://github.com/dustinholdfast/vibeops"
-            className="text-purple-light hover:underline"
-            target="_blank"
-            rel="noreferrer"
-          >
+          <a href="https://github.com/dustinholdfast/vibeops" className="text-purple-light hover:underline" target="_blank" rel="noreferrer">
             VibeOps Local
           </a>
           .
