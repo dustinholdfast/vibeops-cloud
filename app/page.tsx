@@ -52,7 +52,7 @@ export default async function HomePage() {
             The same focused tracker as Local — with accounts, workspaces, and Pro when five projects is no longer enough.
           </p>
           <div className="mt-8 mx-auto w-full max-w-xs space-y-3">
-            <GitHubAuthButton mode="sign-up" label="Continue with GitHub" />
+            <GitHubAuthButton label="Continue with GitHub" />
             <div className="flex items-center justify-center gap-3">
               <Link
                 href="/sign-up"

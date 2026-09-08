@@ -1,50 +1,36 @@
 'use client';
 
 import { useState } from 'react';
-import { useSignIn, useSignUp } from '@clerk/nextjs';
+import { useClerk } from '@clerk/nextjs';
 
-export function GitHubAuthButton({
-  mode,
-  label = 'Continue with GitHub',
-}: {
-  mode: 'sign-in' | 'sign-up';
-  label?: string;
-}) {
-  const { signIn, isLoaded: signInLoaded } = useSignIn();
-  const { signUp, isLoaded: signUpLoaded } = useSignUp();
+function clerkError(cause: unknown): string {
+  if (cause && typeof cause === 'object' && 'errors' in cause) {
+    const first = (cause as { errors?: { longMessage?: string; message?: string }[] }).errors?.[0];
+    if (first?.longMessage) return first.longMessage;
+    if (first?.message) return first.message;
+  }
+  if (cause instanceof Error && cause.message) return cause.message;
+  return 'Could not start GitHub sign-in.';
+}
+
+export function GitHubAuthButton({ label = 'Continue with GitHub' }: { label?: string }) {
+  const clerk = useClerk();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const loaded = mode === 'sign-in' ? signInLoaded : signUpLoaded;
 
   const start = async () => {
-    if (!loaded) return;
     setBusy(true);
     setError(null);
     try {
-      const redirectUrl = mode === 'sign-in' ? '/sign-in/sso-callback' : '/sign-up/sso-callback';
-      if (mode === 'sign-in') {
-        if (!signIn) throw new Error('Sign-in is not ready.');
-        await signIn.authenticateWithRedirect({
-          strategy: 'oauth_github',
-          redirectUrl,
-          redirectUrlComplete: '/dashboard',
-        });
-        return;
-      }
-      if (!signUp) throw new Error('Sign-up is not ready.');
-      await signUp.authenticateWithRedirect({
+      const signIn = clerk.client?.signIn;
+      if (!signIn) throw new Error('Clerk is still loading. Try again in a moment.');
+      await signIn.authenticateWithRedirect({
         strategy: 'oauth_github',
-        redirectUrl,
+        redirectUrl: '/sso-callback',
         redirectUrlComplete: '/dashboard',
       });
     } catch (cause) {
-      const message =
-        cause instanceof Error && /not enabled|oauth_github|strategy/i.test(cause.message)
-          ? 'GitHub is not enabled on this Clerk instance yet. Turn it on under SSO connections.'
-          : cause instanceof Error
-            ? cause.message
-            : 'Could not start GitHub sign-in.';
-      setError(message);
+      setError(clerkError(cause));
       setBusy(false);
     }
   };
@@ -54,7 +40,7 @@ export function GitHubAuthButton({
       <button
         type="button"
         onClick={() => void start()}
-        disabled={!loaded || busy}
+        disabled={!clerk.loaded || busy}
         className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface-elevated px-4 py-2.5 text-sm font-medium text-text hover:border-purple/40 disabled:opacity-50"
       >
         <GitHubMark />

@@ -1,22 +1,13 @@
 # GitHub sign-in
 
-Cloud authenticates with Clerk. GitHub is an OAuth strategy on that instance —
-the app cannot turn the provider on by itself.
+Cloud authenticates with Clerk. GitHub is an OAuth strategy on that instance.
 
 ## Enable the provider
 
-1. [dashboard.clerk.com](https://dashboard.clerk.com) → the VibeOps instance → **SSO connections** → **GitHub**.
-2. Use Clerk's shared GitHub credentials for development, or create a GitHub OAuth App:
-   - Homepage URL: your Cloud origin (`http://localhost:3001` locally, the custom domain in production)
-   - Authorization callback URL: the callback Clerk shows in that panel (copy it exactly)
-3. Toggle **Enable for sign-up and sign-in**.
-4. Repeat on the **production** Clerk instance before cutover. Development and production instances do not share SSO settings.
+1. [dashboard.clerk.com](https://dashboard.clerk.com) → the **same instance** whose `pk_` / `sk_` keys are on Vercel → **SSO connections**.
+2. **Add connection** → **For all users** → GitHub. "For specific users" will not show on the public login page.
+3. Turn on **Enable for sign-up and sign-in**.
+4. Development can use Clerk's shared GitHub app. Production should use a GitHub OAuth App whose callback URL is the one Clerk displays.
+5. Confirm the Vercel env keys belong to that instance. Enabling GitHub on a different Clerk application than `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` will still fail.
 
-After that, `/sign-in` and `/sign-up` show **Continue with GitHub**. Clerk still owns the session; project rows keep using the Clerk user id.
-
-## What the app does
-
-`GitHubAuthButton` calls `authenticateWithRedirect({ strategy: 'oauth_github' })`.
-The catch-all routes `/sign-in/[[...sign-in]]` and `/sign-up/[[...sign-up]]` handle `/sso-callback`. Successful auth lands on `/dashboard`.
-
-If GitHub is not enabled, the button explains that instead of sending the user into a broken Clerk error page.
+The OAuth return path is `/sso-callback`. Add the production origin under Clerk **Allowed redirect URLs** if the dashboard asks for it.
