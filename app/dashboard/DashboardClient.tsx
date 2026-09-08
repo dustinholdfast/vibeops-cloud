@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { UserButton } from '@clerk/nextjs';
 import { Sidebar } from '@/src/components/Sidebar';
 import { Header } from '@/src/components/Header';
@@ -18,6 +18,7 @@ export function DashboardClient({ userId }: { userId: string }) {
   const loadStatus = useProjectStore((s) => s.loadStatus);
   const loadError = useProjectStore((s) => s.loadError);
   const projects = useProjectStore((s) => s.projects);
+  const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
     void loadProjects(userId);
@@ -36,9 +37,18 @@ export function DashboardClient({ userId }: { userId: string }) {
     return () => window.removeEventListener('beforeunload', warn);
   }, []);
 
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setNavOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [navOpen]);
+
   return (
     <div className="flex h-full bg-background text-text overflow-hidden">
-      <Sidebar />
+      <Sidebar mobileOpen={navOpen} onClose={() => setNavOpen(false)} />
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <WorkspaceSaveNotice />
@@ -48,7 +58,7 @@ export function DashboardClient({ userId }: { userId: string }) {
             Loading your workspace…
           </div>
         ) : loadStatus === 'error' ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 text-center">
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 px-4 text-center">
             <p className="text-sm text-danger font-medium">Could not load projects</p>
             <p className="text-xs text-text-dim max-w-md">{loadError || 'Please try again in a moment.'}</p>
             <button
@@ -61,8 +71,9 @@ export function DashboardClient({ userId }: { userId: string }) {
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto">
-            <div className="max-w-6xl mx-auto px-6 py-5 pb-8">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-5 pb-8">
               <Header
+                onMenu={() => setNavOpen(true)}
                 account={
                   <UserButton
                     afterSignOutUrl="/"
