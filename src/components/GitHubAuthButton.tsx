@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useClerk } from '@clerk/nextjs';
-import { clerkGitHubStrategy, clerkSocialStrategies } from '@/src/lib/clerk-github';
+import { clerkGitHubStrategy } from '@/src/lib/clerk-github';
 import type { OAuthStrategy } from '@clerk/types';
 
 function clerkError(cause: unknown): string {
@@ -27,18 +27,8 @@ export function GitHubAuthButton({ label = 'Continue with GitHub' }: { label?: s
       const signIn = clerk.client?.signIn;
       if (!signIn) throw new Error('Clerk is still loading. Try again in a moment.');
 
-      const strategy = clerkGitHubStrategy(clerk);
-      if (!strategy) {
-        const available = clerkSocialStrategies(clerk);
-        throw new Error(
-          available.length
-            ? `GitHub is not an allowed sign-in strategy on this Clerk instance. Allowed: ${available.join(', ')}. Enable GitHub for all users on the instance that matches NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.`
-            : 'No social sign-in strategies are enabled on this Clerk instance. In the Clerk dashboard open the app whose publishable key is on Vercel, SSO connections → Add connection → For all users → GitHub, and turn on Enable for sign-up and sign-in.'
-        );
-      }
-
       await signIn.authenticateWithRedirect({
-        strategy: strategy as OAuthStrategy,
+        strategy: clerkGitHubStrategy(clerk) as OAuthStrategy,
         redirectUrl: '/sso-callback',
         redirectUrlComplete: '/dashboard',
       });
