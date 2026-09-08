@@ -5,12 +5,11 @@ const isPublicRoute = createRouteMatcher([
   '/',
   '/sign-in(.*)',
   '/sign-up(.*)',
+  '/sso-callback(.*)',
   '/pricing',
   '/api/health',
   '/api/webhooks/stripe(.*)',
-  // Authenticates with CRON_SECRET, not with a Clerk session.
   '/api/cron/(.*)',
-  // Must work from a mail client, in a browser that is not signed in.
   '/api/email/unsubscribe',
 ]);
 
