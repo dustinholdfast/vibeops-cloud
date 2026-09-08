@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Shield } from 'lucide-react';
 
 export function AdminLink() {
   const [visible, setVisible] = useState(false);
@@ -23,9 +24,10 @@ export function AdminLink() {
   return (
     <Link
       href="/admin"
-      className="mx-2 mb-2 block rounded-lg px-2.5 py-1.5 text-[13px] text-text-muted hover:bg-surface-elevated hover:text-text"
+      className="mx-2 mb-2 flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px] text-text-muted hover:bg-surface-elevated hover:text-text"
     >
-      Admin
+      <Shield size={14} className="text-purple-light" aria-hidden />
+      Admin console
     </Link>
   );
 }
