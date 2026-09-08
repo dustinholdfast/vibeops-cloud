@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { clerkClient } from '@clerk/nextjs/server';
-import { count, eq } from 'drizzle-orm';
+import { count } from 'drizzle-orm';
 import { requireAdmin } from '@/src/lib/admin';
+import { adminDeleteUser } from '@/src/lib/admin-delete-user';
 import { requireDb } from '@/src/db';
 import {
   projects,
@@ -129,6 +130,18 @@ export async function PATCH(req: Request) {
       cancelStripe: Boolean(body.cancelStripe),
     });
     return NextResponse.json({ ok: true, userId, ...billing });
+  } catch (error) {
+    return projectErrorResponse(error);
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const { userId: actorUserId } = await requireAdmin();
+    const body = (await req.json()) as { userId?: string };
+    const userId = body.userId?.trim();
+    if (!userId) throw new ProjectError(400, 'VALIDATION', 'userId is required.');
+    return NextResponse.json(await adminDeleteUser(actorUserId, userId));
   } catch (error) {
     return projectErrorResponse(error);
   }
