@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Copy, Loader2, Trash2, X } from 'lucide-react';
 import {
   apiCreateInvite,
+  apiDeleteWorkspace,
   apiListInvites,
   apiListMembers,
   apiRemoveMember,
@@ -11,11 +12,10 @@ import {
   apiUpdateMemberRole,
   setActiveWorkspace,
 } from '../lib/api';
-import { canAssignRole, canRemoveMember, WORKSPACE_ROLES } from '../lib/workspace-roles';
+import { can, canAssignRole, canRemoveMember, WORKSPACE_ROLES } from '../lib/workspace-roles';
 import { useProjectStore } from '../store/useProjectStore';
 import type { Workspace, WorkspaceInvite, WorkspaceMember, WorkspaceRole } from '../types';
 
-/** Roles that can be handed out; ownership moves by transfer, not assignment. */
 const ASSIGNABLE = WORKSPACE_ROLES.filter((role) => role !== 'owner');
 
 type Props = {
@@ -27,6 +27,10 @@ export function WorkspaceMembers({ workspace, onClose }: Props) {
   const currentUserId = useProjectStore((s) => s.userId);
   const loadWorkspaces = useProjectStore((s) => s.loadWorkspaces);
   const loadProjects = useProjectStore((s) => s.loadProjects);
+  const drafts = useProjectStore((s) => s.drafts);
+  const creation = useProjectStore((s) => s.creation);
+  const creating = useProjectStore((s) => s.creating);
+  const operationBusy = useProjectStore((s) => s.operationBusy);
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [invites, setInvites] = useState<WorkspaceInvite[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +43,7 @@ export function WorkspaceMembers({ workspace, onClose }: Props) {
   const [copied, setCopied] = useState(false);
 
   const id = workspace.workspaceId;
+  const canDeleteWorkspace = !workspace.personal && can(workspace.role, 'manage:workspace');
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -69,7 +74,6 @@ export function WorkspaceMembers({ workspace, onClose }: Props) {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [onClose]);
 
-  /** Runs a mutation, surfaces its failure, and re-reads the server's truth. */
   const run = async (operation: () => Promise<unknown>) => {
     setBusy(true);
     setError(null);
@@ -101,7 +105,6 @@ export function WorkspaceMembers({ workspace, onClose }: Props) {
     }
   };
 
-  /** Leaving ends your access, so reload the switcher and close rather than refresh. */
   const leave = async () => {
     if (!currentUserId) return;
     setBusy(true);
@@ -114,6 +117,30 @@ export function WorkspaceMembers({ workspace, onClose }: Props) {
       onClose();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not leave this workspace.');
+      setBusy(false);
+    }
+  };
+
+  const destroy = async () => {
+    if (!canDeleteWorkspace) return;
+    if (creating || operationBusy || creation || Object.keys(drafts).length) {
+      setError('Save or discard pending changes before deleting this workspace.');
+      return;
+    }
+    const ok = window.confirm(
+      `Delete “${workspace.name}”? All projects in this workspace will be permanently removed. This cannot be undone.`
+    );
+    if (!ok) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await apiDeleteWorkspace(id);
+      setActiveWorkspace(null);
+      await loadWorkspaces();
+      await loadProjects();
+      onClose();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not delete that workspace.');
       setBusy(false);
     }
   };
@@ -140,12 +167,7 @@ export function WorkspaceMembers({ workspace, onClose }: Props) {
               Members can edit projects. Viewers can only read them.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="rounded-lg p-1 text-text-dim transition-colors hover:text-text"
-          >
+          <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-1 text-text-dim transition-colors hover:text-text">
             <X size={18} aria-hidden />
           </button>
         </div>
@@ -157,9 +179,7 @@ export function WorkspaceMembers({ workspace, onClose }: Props) {
         )}
 
         <form onSubmit={sendInvite} className="mt-4 flex flex-wrap gap-2">
-          <label htmlFor="invite-email" className="sr-only">
-            Email address
-          </label>
+          <label htmlFor="invite-email" className="sr-only">Email address</label>
           <input
             id="invite-email"
             type="email"
@@ -168,9 +188,7 @@ export function WorkspaceMembers({ workspace, onClose }: Props) {
             placeholder="teammate@example.com"
             className="min-w-[200px] flex-1 rounded-lg border border-border bg-surface-elevated px-3 py-2 text-sm text-text placeholder:text-text-dim focus:border-purple/50 focus:outline-none"
           />
-          <label htmlFor="invite-role" className="sr-only">
-            Role
-          </label>
+          <label htmlFor="invite-role" className="sr-only">Role</label>
           <select
             id="invite-role"
             value={role}
@@ -178,16 +196,10 @@ export function WorkspaceMembers({ workspace, onClose }: Props) {
             className="rounded-lg border border-border bg-surface-elevated px-2 py-2 text-sm capitalize text-text focus:border-purple/50 focus:outline-none"
           >
             {ASSIGNABLE.map((option) => (
-              <option key={option} value={option} className="capitalize">
-                {option}
-              </option>
+              <option key={option} value={option} className="capitalize">{option}</option>
             ))}
           </select>
-          <button
-            type="submit"
-            disabled={busy || !email.trim()}
-            className="rounded-lg bg-purple px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-light disabled:opacity-40"
-          >
+          <button type="submit" disabled={busy || !email.trim()} className="rounded-lg bg-purple px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-light disabled:opacity-40">
             Invite
           </button>
         </form>
@@ -198,9 +210,7 @@ export function WorkspaceMembers({ workspace, onClose }: Props) {
               Send this link to your teammate. It is shown once and cannot be recovered later.
             </p>
             <div className="mt-2 flex items-center gap-2">
-              <code className="min-w-0 flex-1 truncate rounded bg-surface-elevated px-2 py-1.5 text-xs text-text">
-                {inviteUrl}
-              </code>
+              <code className="min-w-0 flex-1 truncate rounded bg-surface-elevated px-2 py-1.5 text-xs text-text">{inviteUrl}</code>
               <button
                 type="button"
                 onClick={() => {
@@ -229,10 +239,7 @@ export function WorkspaceMembers({ workspace, onClose }: Props) {
                 const mayAssign = canAssignRole(actor, subject, 'member').ok;
 
                 return (
-                  <li
-                    key={member.userId}
-                    className="flex items-center gap-2 rounded-lg border border-border-subtle px-3 py-2"
-                  >
+                  <li key={member.userId} className="flex items-center gap-2 rounded-lg border border-border-subtle px-3 py-2">
                     <span className="min-w-0 flex-1 truncate text-sm text-text">
                       {member.name || member.email || member.userId}
                       {isSelf && <span className="ml-1.5 text-xs text-text-dim">(you)</span>}
@@ -240,7 +247,6 @@ export function WorkspaceMembers({ workspace, onClose }: Props) {
                         <span className="ml-1.5 text-xs text-text-dim">{member.email}</span>
                       )}
                     </span>
-
                     {mayAssign ? (
                       <select
                         aria-label={`Role for ${member.name || member.email || member.userId}`}
@@ -248,34 +254,23 @@ export function WorkspaceMembers({ workspace, onClose }: Props) {
                         disabled={busy}
                         onChange={(event) =>
                           void run(() =>
-                            apiUpdateMemberRole(
-                              id,
-                              member.userId,
-                              event.target.value as WorkspaceRole
-                            )
+                            apiUpdateMemberRole(id, member.userId, event.target.value as WorkspaceRole)
                           )
                         }
                         className="rounded-md border border-border bg-surface-elevated px-1.5 py-1 text-xs capitalize text-text focus:border-purple/50 focus:outline-none"
                       >
                         {ASSIGNABLE.map((option) => (
-                          <option key={option} value={option} className="capitalize">
-                            {option}
-                          </option>
+                          <option key={option} value={option} className="capitalize">{option}</option>
                         ))}
                       </select>
                     ) : (
                       <span className="text-xs capitalize text-text-dim">{member.role}</span>
                     )}
-
                     {mayRemove && (
                       <button
                         type="button"
                         disabled={busy}
-                        aria-label={
-                          isSelf
-                            ? 'Leave workspace'
-                            : `Remove ${member.name || member.email || member.userId}`
-                        }
+                        aria-label={isSelf ? 'Leave workspace' : `Remove ${member.name || member.email || member.userId}`}
                         onClick={() =>
                           isSelf ? void leave() : void run(() => apiRemoveMember(id, member.userId))
                         }
@@ -293,18 +288,11 @@ export function WorkspaceMembers({ workspace, onClose }: Props) {
 
         {invites.length > 0 && (
           <div className="mt-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-text-dim">
-              Pending invitations
-            </h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-text-dim">Pending invitations</h3>
             <ul className="mt-2 space-y-1.5">
               {invites.map((invite) => (
-                <li
-                  key={invite.id}
-                  className="flex items-center gap-2 rounded-lg border border-border-subtle px-3 py-2"
-                >
-                  <span className="min-w-0 flex-1 truncate text-sm text-text-muted">
-                    {invite.email}
-                  </span>
+                <li key={invite.id} className="flex items-center gap-2 rounded-lg border border-border-subtle px-3 py-2">
+                  <span className="min-w-0 flex-1 truncate text-sm text-text-muted">{invite.email}</span>
                   <span className="text-xs capitalize text-text-dim">{invite.role}</span>
                   <button
                     type="button"
@@ -318,6 +306,23 @@ export function WorkspaceMembers({ workspace, onClose }: Props) {
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {canDeleteWorkspace && (
+          <div className="mt-6 border-t border-border-subtle pt-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-danger">Danger zone</h3>
+            <p className="mt-1 text-xs text-text-dim">
+              Deletes this workspace and every project in it. Your personal workspace is not affected.
+            </p>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void destroy()}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-danger/40 bg-danger/5 px-3 py-2 text-sm font-medium text-danger hover:bg-danger/10 disabled:opacity-40"
+            >
+              <Trash2 size={14} aria-hidden /> Delete workspace
+            </button>
           </div>
         )}
       </div>
