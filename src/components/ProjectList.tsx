@@ -9,6 +9,7 @@ import {
   cn,
   HEALTH_OPTIONS,
 } from '../lib/utils';
+import { isRotting, quietLabel } from '../lib/rotting';
 import type { Priority, Stage, Health, DeadlineState } from '../types';
 import { ExternalLink, Github } from 'lucide-react';
 import { SaveStatusChip } from './SaveStatus';
@@ -137,11 +138,15 @@ export function ProjectList() {
         <div className="space-y-2">
           {filtered.map((project) => {
             const deadline = getDeadlineState(project.targetDate, project.stage);
+            const rotting = isRotting(project);
             return (
               <div
                 key={project.id}
                 onClick={() => openDrawer(project.id)}
-                className="group rounded-2xl border border-border bg-surface px-4 py-3.5 hover:border-purple/40 cursor-pointer transition-colors"
+                className={cn(
+                  'group rounded-2xl border bg-surface px-4 py-3.5 cursor-pointer transition-colors',
+                  rotting ? 'border-warning/45 hover:border-warning/70' : 'border-border hover:border-purple/40'
+                )}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
@@ -156,6 +161,11 @@ export function ProjectList() {
                       </span>
                       {project.priority === 'Now' && (
                         <span className="rounded-full bg-purple/15 px-2 py-0.5 text-[11px] text-purple-light">Now</span>
+                      )}
+                      {rotting && (
+                        <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[11px] text-warning">
+                          {quietLabel(project)}
+                        </span>
                       )}
                     </div>
                     <p className="text-sm text-text-muted truncate mt-1">{project.nextAction || 'No next action yet'}</p>
