@@ -3,6 +3,7 @@ import {
   text,
   timestamp,
   integer,
+  bigserial,
   jsonb,
   index,
   uniqueIndex,
@@ -143,6 +144,13 @@ export const emailPreferences = pgTable(
     userId: text('user_id').primaryKey(),
     /** 1 = send the weekly digest. */
     weeklyDigest: integer('weekly_digest').notNull().default(1),
+    /**
+     * `uptime_alerts` also lives on this table but is deliberately absent here.
+     * Drizzle names every column in a `select()`, so listing it would make each
+     * existing digest query fail until the uptime migration is applied. It is
+     * read and written by raw SQL in `monitor-service.ts` instead, which keeps
+     * a late migration to "uptime alerts are off" rather than "email is broken".
+     */
     /** Bearer of this token may unsubscribe without signing in. */
     unsubscribeToken: text('unsubscribe_token').notNull(),
     /** Guards against a retried cron sending the same week twice. */
@@ -151,6 +159,56 @@ export const emailPreferences = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
   },
   (t) => [uniqueIndex('email_preferences_token_idx').on(t.unsubscribeToken)]
+);
+
+/**
+ * One uptime monitor per project, keyed by the project it watches.
+ *
+ * `workspace_id` is denormalised from `projects` so the cron can decide who to
+ * email without joining, and so a monitor cannot outlive its project's scope.
+ */
+export const projectMonitors = pgTable(
+  'project_monitors',
+  {
+    projectId: text('project_id').primaryKey(),
+    workspaceId: text('workspace_id').notNull(),
+    /** Validated and normalised by `lib/uptime/target.ts` before it is stored. */
+    url: text('url').notNull(),
+    enabled: integer('enabled').notNull().default(1),
+    intervalSeconds: integer('interval_seconds').notNull().default(300),
+    timeoutMs: integer('timeout_ms').notNull().default(10000),
+    /** Consecutive failures before it counts as down and alerts. */
+    failureThreshold: integer('failure_threshold').notNull().default(2),
+    /** 'unknown' | 'up' | 'down' */
+    status: text('status').notNull().default('unknown'),
+    consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+    consecutiveSuccesses: integer('consecutive_successes').notNull().default(0),
+    lastCheckedAt: timestamp('last_checked_at', { withTimezone: true }),
+    lastStatusChangeAt: timestamp('last_status_change_at', { withTimezone: true }),
+    lastError: text('last_error'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    index('project_monitors_due_idx').on(t.enabled, t.lastCheckedAt),
+    index('project_monitors_workspace_idx').on(t.workspaceId),
+  ]
+);
+
+/** One row per probe. Pruned on a rolling window by the cron. */
+export const projectChecks = pgTable(
+  'project_checks',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    projectId: text('project_id').notNull(),
+    checkedAt: timestamp('checked_at', { withTimezone: true }).notNull(),
+    /** 1 = the target answered healthily. Integer for consistency with the rest. */
+    ok: integer('ok').notNull(),
+    statusCode: integer('status_code'),
+    latencyMs: integer('latency_ms'),
+    error: text('error'),
+  },
+  (t) => [index('project_checks_project_time_idx').on(t.projectId, t.checkedAt)]
 );
 
 export type DbProject = typeof projects.$inferSelect;
@@ -162,3 +220,5 @@ export type DbWorkspaceMember = typeof workspaceMembers.$inferSelect;
 export type DbWorkspaceInvite = typeof workspaceInvites.$inferSelect;
 export type DbEmailPreferences = typeof emailPreferences.$inferSelect;
 export type NewDbSubscription = typeof subscriptions.$inferInsert;
+export type DbProjectMonitor = typeof projectMonitors.$inferSelect;
+export type DbProjectCheck = typeof projectChecks.$inferSelect;

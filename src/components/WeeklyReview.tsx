@@ -60,18 +60,18 @@ function Timeline({ review, onOpen }: { review: PortfolioReview; onOpen: (id: st
       </h4>
       <ul className="mt-2 space-y-1.5">
         {shown.map((entry) => (
-          <li key={`${entry.project.id}-${entry.item.id}`} className="flex gap-2 text-xs">
+          <li key={`${entry.project.id}-${entry.item.id}`} className="flex flex-wrap sm:flex-nowrap gap-2 text-xs">
             <span className="w-20 flex-shrink-0 text-right tabular-nums text-text-dim">
               {formatDistanceToNow(entry.at, { addSuffix: true })}
             </span>
             <button
               type="button"
               onClick={() => onOpen(entry.project.id)}
-              className="flex-shrink-0 font-medium text-purple-light hover:underline"
+              className="min-w-0 break-words font-medium text-purple-light hover:underline"
             >
               {entry.project.name}
             </button>
-            <span className="min-w-0 flex-1 truncate text-text-muted">{entry.item.message}</span>
+            <span className="min-w-0 basis-full sm:basis-auto flex-1 break-words text-text-muted">{entry.item.message}</span>
           </li>
         ))}
       </ul>

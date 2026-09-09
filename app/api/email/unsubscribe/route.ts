@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { unsubscribeByToken } from '@/src/db/digest-service';
+import { unsubscribeAlertsByToken } from '@/src/db/monitor-service';
 
 /**
  * Unsubscribe by token. Public by design: a link in an email has to work
@@ -25,14 +26,32 @@ function page(title: string, message: string, status: number) {
   });
 }
 
+/**
+ * Which list the link opts out of. The two are separate on purpose: someone who
+ * does not want a weekly summary usually still wants to hear that their site is
+ * down, so one link must never silence the other.
+ */
+function kindOf(url: URL): 'digest' | 'uptime' {
+  return url.searchParams.get('kind') === 'uptime' ? 'uptime' : 'digest';
+}
+
+function unsubscribe(kind: 'digest' | 'uptime', token: string): Promise<boolean> {
+  return kind === 'uptime' ? unsubscribeAlertsByToken(token) : unsubscribeByToken(token);
+}
+
 export async function GET(req: Request) {
-  const token = new URL(req.url).searchParams.get('token') ?? '';
+  const url = new URL(req.url);
+  const token = url.searchParams.get('token') ?? '';
+  const kind = kindOf(url);
+
   try {
-    const done = await unsubscribeByToken(token);
+    const done = await unsubscribe(kind, token);
     return done
       ? page(
           'Unsubscribed',
-          'You will not receive the weekly review email again. You can turn it back on any time from your dashboard.',
+          kind === 'uptime'
+            ? 'You will not receive uptime alerts again. Your weekly review email is unaffected, and you can turn alerts back on any time from your dashboard.'
+            : 'You will not receive the weekly review email again. You can turn it back on any time from your dashboard.',
           200
         )
       : page(
@@ -59,6 +78,6 @@ export async function POST(req: Request) {
     token = new URLSearchParams(body).get('token') ?? '';
   }
 
-  const done = await unsubscribeByToken(token).catch(() => false);
+  const done = await unsubscribe(kindOf(url), token).catch(() => false);
   return NextResponse.json({ ok: done }, { status: done ? 200 : 400 });
 }

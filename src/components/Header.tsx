@@ -114,10 +114,10 @@ export function Header() {
           <p className="text-xs font-medium tracking-wider text-text-dim uppercase">
             {format(new Date(), 'EEEE, MMMM d').toUpperCase()}
           </p>
-          <h1 className="text-2xl font-semibold text-text mt-1 tracking-tight">{heading}</h1>
+          <h1 className="text-xl sm:text-2xl break-words font-semibold text-text mt-1 tracking-tight">{heading}</h1>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex w-full items-center gap-2 flex-wrap">
           <button
             type="button"
             onClick={toggleTheme}
@@ -129,14 +129,14 @@ export function Header() {
             {isDark ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
-          <div className="relative">
+          <div className="relative min-w-0 basis-full order-first sm:order-none sm:basis-auto">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-dim" />
             <input
               type="text"
               placeholder="Search projects"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-48 pl-9 pr-3 py-2 rounded-lg bg-surface border border-border text-sm text-text placeholder:text-text-dim focus:outline-none focus:border-purple/50 focus:ring-1 focus:ring-purple/30"
+              aria-label="Search projects" className="w-full sm:w-48 pl-9 pr-3 py-2 rounded-lg bg-surface border border-border text-sm text-text placeholder:text-text-dim focus:outline-none focus:border-purple/50 focus:ring-1 focus:ring-purple/30"
             />
           </div>
 
@@ -144,7 +144,7 @@ export function Header() {
             type="button"
             onClick={handleExport}
             className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-surface border border-border text-text-muted hover:text-text text-sm transition-colors"
-            title="Export projects as JSON"
+            aria-label="Export projects as JSON" title="Export projects as JSON"
           >
             <Download size={15} />
             <span className="hidden sm:inline">Export</span>
@@ -155,7 +155,7 @@ export function Header() {
             onClick={handleImportClick}
             disabled={operationBusy || creating}
             className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-surface border border-border text-text-muted hover:text-text text-sm transition-colors"
-            title="Import projects from JSON"
+            aria-label="Import projects from JSON" title="Import projects from JSON"
           >
             <Upload size={15} />
             <span className="hidden sm:inline">Import</span>
@@ -169,7 +169,7 @@ export function Header() {
           />
 
           {showAdd ? (
-            <div className="flex items-center gap-2">
+            <div className="flex w-full sm:w-auto flex-wrap items-center gap-2">
               <input
                 autoFocus
                 type="text"
@@ -181,7 +181,7 @@ export function Header() {
                   if (e.key === 'Enter') handleAdd();
                   if (e.key === 'Escape' && !creating) { cancelCreation(); setShowAdd(false); }
                 }}
-                className="w-48 px-3 py-2 rounded-lg bg-surface border border-border text-sm text-text placeholder:text-text-dim focus:outline-none focus:border-purple/50"
+                aria-label="New project name" className="min-w-0 w-full sm:w-48 px-3 py-2 rounded-lg bg-surface border border-border text-sm text-text placeholder:text-text-dim focus:outline-none focus:border-purple/50"
               />
               <button
                 onClick={handleAdd}

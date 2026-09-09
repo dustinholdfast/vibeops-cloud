@@ -62,3 +62,53 @@ export interface WorkspaceInvite {
   expiresAt: string;
   createdAt: string;
 }
+
+// --- Uptime monitoring ----------------------------------------------------
+
+export type MonitorStatus = 'unknown' | 'up' | 'down';
+
+export type UptimeMonitor = {
+  projectId: string;
+  url: string;
+  enabled: boolean;
+  intervalSeconds: number;
+  failureThreshold: number;
+  status: MonitorStatus;
+  lastCheckedAt: string | null;
+  lastStatusChangeAt: string | null;
+  lastError: string | null;
+};
+
+export type UptimeWindow = {
+  checks: number;
+  failures: number;
+  /** Null when nothing has been checked in the window — not the same as 0%. */
+  uptimePct: number | null;
+  avgLatencyMs: number | null;
+};
+
+export type UptimeBucket = {
+  start: string;
+  end: string;
+  total: number;
+  failed: number;
+  state: 'none' | 'up' | 'degraded' | 'down';
+};
+
+export type UptimeCheck = {
+  checkedAt: string;
+  ok: boolean;
+  statusCode: number | null;
+  latencyMs: number | null;
+  error: string | null;
+};
+
+export type UptimeSnapshot = {
+  /** False when the monitoring migration has not been applied. */
+  available: boolean;
+  monitor: UptimeMonitor | null;
+  windows?: { day: UptimeWindow; week: UptimeWindow; month: UptimeWindow };
+  buckets?: UptimeBucket[];
+  streakMs?: number | null;
+  recent?: UptimeCheck[];
+};

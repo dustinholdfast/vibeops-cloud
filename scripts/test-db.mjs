@@ -43,9 +43,21 @@ if (/(^|[@/])(prod|production)/i.test(url)) {
 
 // Run through node directly rather than the npx shim, which Node refuses to
 // spawn without a shell on Windows.
-const child = spawn(
-  process.execPath,
-  ['--import', 'tsx', 'src/db/project-service.test.ts'],
-  { stdio: 'inherit', env: process.env }
-);
-child.on('exit', (code) => process.exit(code ?? 1));
+// Each suite builds and truncates its own tables, so they run in separate
+// processes rather than racing over the same database.
+const suites = ['src/db/project-service.test.ts', 'src/db/monitor-service.test.ts'];
+
+let failed = 0;
+
+for (const suite of suites) {
+  const code = await new Promise((resolve) => {
+    const child = spawn(process.execPath, ['--import', 'tsx', suite], {
+      stdio: 'inherit',
+      env: process.env,
+    });
+    child.on('exit', (value) => resolve(value ?? 1));
+  });
+  if (code !== 0) failed = code;
+}
+
+process.exit(failed);

@@ -82,3 +82,33 @@ body {
   outline: 2px solid var(--color-purple);
   outline-offset: 2px;
 }
+
+/* Cards keep every project field available before the full table fits. */
+.project-table-heading { display: none; }
+.project-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.project-summary { grid-column: 1 / -1; }
+.project-row > [data-label] { min-width: 0; flex-wrap: wrap; align-content: start; gap: 0.375rem; }
+.project-row > [data-label]::before {
+  content: attr(data-label);
+  width: 100%;
+  color: var(--color-text-dim);
+  font-size: 11px;
+}
+@media (min-width: 1280px) {
+  .project-table-heading, .project-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) 90px 130px 100px 100px 90px 50px;
+  }
+  .project-summary { grid-column: auto; }
+  .project-row > [data-label]::before { display: none; }
+}
+@media (max-width: 639px) {
+  .project-row { grid-template-columns: minmax(0, 1fr); }
+  .dashboard button, .dashboard select, .dashboard a { min-height: 44px; }
+  .dashboard button, .dashboard a { min-width: 44px; }
+  .dashboard input:not([type="range"]), .dashboard textarea, .dashboard select {
+    font-size: 16px;
+  }
+  .dashboard input:not([type="range"]) { min-height: 44px; }
+  .dashboard main { overflow-wrap: anywhere; }
+}

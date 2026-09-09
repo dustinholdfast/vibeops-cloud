@@ -4,6 +4,8 @@ import type {
   WorkspaceInvite,
   WorkspaceMember,
   WorkspaceRole,
+  UptimeMonitor,
+  UptimeSnapshot,
 } from '@/src/types';
 
 export const WORKSPACE_HEADER = 'x-vibeops-workspace';
@@ -229,4 +231,40 @@ export async function apiAcceptInvite(token: string): Promise<Workspace> {
     body: JSON.stringify({ token }),
   });
   return (await parseJson<{ workspace: Workspace }>(res)).workspace;
+}
+
+// --- Uptime monitoring ----------------------------------------------------
+//
+// Addressed by project id and scoped by the active workspace, like every other
+// project call.
+
+export async function apiGetMonitor(projectId: string): Promise<UptimeSnapshot> {
+  const res = await request(`/api/projects/${projectId}/monitor`, { credentials: 'include' });
+  return parseJson<UptimeSnapshot>(res);
+}
+
+export async function apiSaveMonitor(
+  projectId: string,
+  body: {
+    url?: string;
+    enabled?: boolean;
+    intervalSeconds?: number;
+    failureThreshold?: number;
+  }
+): Promise<UptimeMonitor | null> {
+  const res = await request(`/api/projects/${projectId}/monitor`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return (await parseJson<{ monitor: UptimeMonitor | null }>(res)).monitor;
+}
+
+export async function apiDeleteMonitor(projectId: string): Promise<void> {
+  const res = await request(`/api/projects/${projectId}/monitor`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+  await parseJson<{ deleted?: boolean }>(res);
 }

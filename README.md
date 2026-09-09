@@ -17,6 +17,7 @@ Local edition: [dustinholdfast/vibeops](https://github.com/dustinholdfast/vibeop
 | Portfolio intelligence (daily brief, momentum, review) | ✅ |
 | Team workspaces (roles, invites) | ✅ |
 | Weekly digest email | ✅ |
+| Uptime monitoring (per-project pings, history, alerts) | ✅ |
 
 ---
 
@@ -86,6 +87,34 @@ and stalled. A week where nothing happened sends nothing.
 
 Sending is off until you configure it, and the cron is a dry run unless called
 with `?send=1`. See [DIGEST_ROLLOUT.md](./DIGEST_ROLLOUT.md).
+
+---
+
+## Uptime monitoring
+
+Any project can be pinged on a schedule. The drawer shows the current state, a
+24-hour strip (one column per half hour, so a blip reads differently from a bad
+afternoon), and uptime over 24 hours, 7 days and 30 days.
+
+- A monitor goes **down** only after two consecutive failures, and alerts on
+  transitions — one email per outage, not one per check. Recovery mails too.
+- 2xx and 3xx count as up. Redirects are not followed: one could point at a
+  private address.
+- User-supplied URLs are checked against a private-address blocklist
+  ([`src/lib/uptime/target.ts`](./src/lib/uptime/target.ts)) both when saved and
+  again at probe time.
+- Alerts and the weekly digest unsubscribe separately — turning off a summary
+  should not silence "your site is down".
+
+Being due is computed per monitor in SQL, so `/api/cron/uptime` is safe to call
+at any frequency and works with any scheduler. Without `?send=1` it is a true
+dry run that writes nothing.
+
+**No schedule ships in `vercel.json`** — Vercel Hobby rejects sub-daily cron
+expressions at deploy time, so wiring one in by default would break deploys on
+that plan. Nothing is checked until you add the Vercel Pro cron entry or point
+an external scheduler at the endpoint. See
+[UPTIME_ROLLOUT.md](./UPTIME_ROLLOUT.md) for both, and for the migration.
 
 ---
 

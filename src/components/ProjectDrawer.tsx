@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { SaveStatus } from './SaveStatus';
 import { projectMomentum, type MomentumState } from '../lib/review';
+import { UptimeCard } from './UptimeCard';
 
 const stages: Stage[] = ['Exploring', 'Building', 'Testing', 'Live', 'Paused', 'Archived'];
 
@@ -148,7 +149,7 @@ export function ProjectDrawer() {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-            className="fixed top-0 right-0 h-full w-full max-w-md bg-surface border-l border-border z-50 flex flex-col shadow-2xl"
+            className="fixed top-0 right-0 h-dvh w-full max-w-md bg-surface border-l border-border z-50 flex flex-col shadow-2xl"
           >
             <div className="flex items-start justify-between px-5 py-4 border-b border-border-subtle">
               <div className="min-w-0 flex-1">
@@ -172,7 +173,7 @@ export function ProjectDrawer() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 space-y-6">
               <SaveStatus id={project.id} />
               <div>
                 <label
@@ -271,7 +272,7 @@ export function ProjectDrawer() {
                     onChange={(e) =>
                       setTargetDate(project.id, e.target.value || null)
                     }
-                    className="flex-1 bg-surface-elevated border border-border rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-purple/50"
+                    className="min-w-0 flex-1 bg-surface-elevated border border-border rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-purple/50"
                   />
                   {project.targetDate && (
                     <button
@@ -353,7 +354,7 @@ export function ProjectDrawer() {
                     </div>
                   </div>
                 ) : (
-                  <p className="mt-2 text-sm text-text bg-surface-elevated border border-border rounded-lg px-3 py-2.5">
+                  <p className="mt-2 break-words text-sm text-text bg-surface-elevated border border-border rounded-lg px-3 py-2.5">
                     {project.nextAction || (
                       <span className="text-text-dim italic">No next action defined</span>
                     )}
@@ -506,6 +507,15 @@ export function ProjectDrawer() {
               </div>
 
               <div>
+                <h3 className="text-xs font-medium text-text-dim uppercase tracking-wider">
+                  Uptime
+                </h3>
+                <div className="mt-2">
+                  <UptimeCard project={project} />
+                </div>
+              </div>
+
+              <div>
                 <label
                   htmlFor="drawer-note"
                   className="text-xs font-medium text-text-dim uppercase tracking-wider"
@@ -557,7 +567,7 @@ export function ProjectDrawer() {
                           aria-hidden
                         />
                         <div className="min-w-0">
-                          <p className="text-sm text-text">{item.message}</p>
+                          <p className="text-sm text-text break-words">{item.message}</p>
                           <p className="text-xs text-text-dim mt-0.5">
                             {item.author && `${item.author} · `}
                             {formatLastTouched(item.timestamp)}
@@ -570,7 +580,7 @@ export function ProjectDrawer() {
               </div>
             </div>
 
-            <div className="px-5 py-4 border-t border-border-subtle flex items-center justify-between">
+            <div className="px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-border-subtle flex items-center justify-between">
               <button
                 type="button"
                 onClick={() => {

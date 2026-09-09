@@ -166,7 +166,7 @@ export function WorkspaceMembers({ workspace, onClose }: Props) {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="teammate@example.com"
-            className="min-w-[200px] flex-1 rounded-lg border border-border bg-surface-elevated px-3 py-2 text-sm text-text placeholder:text-text-dim focus:border-purple/50 focus:outline-none"
+            className="min-w-0 basis-full sm:basis-auto flex-1 rounded-lg border border-border bg-surface-elevated px-3 py-2 text-sm text-text placeholder:text-text-dim focus:border-purple/50 focus:outline-none"
           />
           <label htmlFor="invite-role" className="sr-only">
             Role

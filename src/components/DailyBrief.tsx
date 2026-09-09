@@ -69,11 +69,11 @@ export function DailyBrief() {
               id="daily-brief-title"
               type="button"
               onClick={() => openDrawer(recommendation.project.id)}
-              className="mt-1 text-left text-base font-semibold text-text hover:text-purple-light transition-colors"
+              className="mt-1 break-words text-left text-base font-semibold text-text hover:text-purple-light transition-colors"
             >
               {recommendation.project.name}
             </button>
-            <p className="mt-0.5 text-sm text-text-muted">
+            <p className="mt-0.5 break-words text-sm text-text-muted">
               {recommendation.project.nextAction}
             </p>
             <div className="mt-2 flex flex-wrap gap-1.5">
@@ -89,7 +89,7 @@ export function DailyBrief() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {canClaim && (
             <button
               type="button"

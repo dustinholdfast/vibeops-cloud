@@ -79,7 +79,7 @@ export function ProjectList() {
         </h2>
 
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5" role="group" aria-label="Filter by health">
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter by health">
             <span className="text-[11px] uppercase tracking-wider text-text-dim mr-1">
               Health
             </span>
@@ -101,7 +101,7 @@ export function ProjectList() {
             ))}
           </div>
 
-          <div className="flex items-center gap-1.5" role="group" aria-label="Filter by deadline">
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter by deadline">
             <span className="text-[11px] uppercase tracking-wider text-text-dim mr-1">
               Deadline
             </span>
@@ -148,10 +148,7 @@ export function ProjectList() {
 
       <div className="rounded-xl border border-border bg-surface overflow-hidden">
         <div
-          className="grid gap-3 px-4 py-2.5 text-[11px] font-medium tracking-wider text-text-dim uppercase border-b border-border-subtle"
-          style={{
-            gridTemplateColumns: 'minmax(180px,1.4fr) 100px 130px 110px 120px 100px 70px',
-          }}
+          className="project-table-heading gap-3 px-4 py-2.5 text-[11px] font-medium tracking-wider text-text-dim uppercase border-b border-border-subtle"
         >
           <div>Project & Next Action</div>
           <div>Stage</div>
@@ -173,15 +170,11 @@ export function ProjectList() {
               <div
                 key={project.id}
                 onClick={() => openDrawer(project.id)}
-                className="grid gap-3 px-4 py-3.5 border-b border-border-subtle last:border-0 hover:bg-surface-elevated/60 cursor-pointer transition-colors group"
-                style={{
-                  gridTemplateColumns:
-                    'minmax(180px,1.4fr) 100px 130px 110px 120px 100px 70px',
-                }}
+                className="project-row grid gap-3 px-4 py-3.5 border-b border-border-subtle last:border-0 hover:bg-surface-elevated/60 cursor-pointer transition-colors group"
               >
-                <div className="min-w-0">
+                <div className="min-w-0 project-summary">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-text truncate">{project.name}</span>
+                    <button type="button" onClick={(event) => { event.stopPropagation(); openDrawer(project.id); }} className="min-w-0 text-left font-medium text-text break-words xl:truncate">{project.name}</button>
                     <div className="h-1 w-12 rounded-full bg-border-subtle overflow-hidden flex-shrink-0">
                       <div
                         className="h-full bg-purple rounded-full"
@@ -189,12 +182,12 @@ export function ProjectList() {
                       />
                     </div>
                   </div>
-                  <p className="text-sm text-text-muted truncate mt-0.5">
+                  <p className="text-sm text-text-muted break-words xl:truncate mt-0.5">
                     {project.nextAction}
                   </p>
                 </div>
 
-                <div className="flex items-center">
+                <div data-label="Stage" className="flex items-center">
                   <span className="inline-flex items-center gap-1.5 text-sm text-text-muted">
                     <span
                       className={cn('w-1.5 h-1.5 rounded-full', stageColor[project.stage])}
@@ -205,7 +198,7 @@ export function ProjectList() {
                 </div>
 
                 <div
-                  className="flex items-center gap-1"
+                  data-label="Priority" className="flex items-center gap-1"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {(['Now', 'Next', 'Later'] as Priority[]).map((p) => (
@@ -228,7 +221,7 @@ export function ProjectList() {
                 </div>
 
                 <div
-                  className="flex items-center"
+                  data-label="Health" className="flex items-center"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <label className="sr-only" htmlFor={`health-${project.id}`}>
@@ -252,7 +245,7 @@ export function ProjectList() {
                   </select>
                 </div>
 
-                <div className="flex items-center text-sm">
+                <div data-label="Target" className="flex items-center text-sm">
                   {deadline === 'none' ? (
                     <span className="text-text-dim italic text-xs">Set a target date</span>
                   ) : (
@@ -267,12 +260,12 @@ export function ProjectList() {
                   )}
                 </div>
 
-                <div className="flex flex-col gap-1.5 text-sm text-text-muted">
+                <div data-label="Last touched" className="flex flex-col gap-1.5 text-sm text-text-muted">
                   <span>{formatLastTouched(project.lastTouched)}</span>
                   <SaveStatusChip id={project.id} />
                 </div>
 
-                <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
+                <div data-label="Links" className="flex items-center" onClick={(e) => e.stopPropagation()}>
                   {project.liveUrl ? (
                     <a
                       href={project.liveUrl}
