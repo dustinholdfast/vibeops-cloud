@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronsUpDown, Plus, Users } from 'lucide-react';
+import { Check, ChevronsUpDown, Plus, Trash2, Users } from 'lucide-react';
+import { apiDeleteWorkspace, setActiveWorkspace } from '../lib/api';
 import { useProjectStore } from '../store/useProjectStore';
 import { can } from '../lib/workspace-roles';
 import { cn } from '../lib/utils';
@@ -14,11 +15,18 @@ export function WorkspaceSwitcher() {
   const switching = useProjectStore((s) => s.switchingWorkspace);
   const switchWorkspace = useProjectStore((s) => s.switchWorkspace);
   const createWorkspace = useProjectStore((s) => s.createWorkspace);
+  const loadWorkspaces = useProjectStore((s) => s.loadWorkspaces);
+  const loadProjects = useProjectStore((s) => s.loadProjects);
+  const drafts = useProjectStore((s) => s.drafts);
+  const creation = useProjectStore((s) => s.creation);
+  const creating = useProjectStore((s) => s.creating);
+  const operationBusy = useProjectStore((s) => s.operationBusy);
 
   const [open, setOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
+  const [creatingWs, setCreatingWs] = useState(false);
   const [name, setName] = useState('');
   const [managing, setManaging] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const active =
@@ -51,8 +59,40 @@ export function WorkspaceSwitcher() {
     const created = await createWorkspace(trimmed);
     if (created) {
       setName('');
-      setCreating(false);
+      setCreatingWs(false);
       setOpen(false);
+    }
+  };
+
+  const canDelete =
+    active && !active.personal && can(active.role, 'manage:workspace') && !deleting;
+
+  const deleteActive = async () => {
+    if (!active || active.personal) return;
+    if (creating || operationBusy || creation || Object.keys(drafts).length) {
+      useProjectStore.setState({
+        workspaceError: 'Save or discard pending changes before deleting this workspace.',
+      });
+      return;
+    }
+    const ok = window.confirm(
+      `Delete “${active.name}”? All projects in this workspace will be permanently removed. This cannot be undone.`
+    );
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      await apiDeleteWorkspace(active.workspaceId);
+      setActiveWorkspace(null);
+      await loadWorkspaces();
+      await loadProjects();
+      setOpen(false);
+    } catch (cause) {
+      useProjectStore.setState({
+        workspaceError:
+          cause instanceof Error ? cause.message : 'Could not delete that workspace.',
+      });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -63,7 +103,7 @@ export function WorkspaceSwitcher() {
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-haspopup="menu"
-        disabled={switching}
+        disabled={switching || deleting}
         className="flex w-full items-center gap-2 rounded-lg border border-border bg-surface-elevated px-2.5 py-2 text-left text-sm transition-colors hover:border-purple/40 disabled:opacity-60"
       >
         <span className="min-w-0 flex-1">
@@ -71,7 +111,7 @@ export function WorkspaceSwitcher() {
             {active?.name ?? 'Personal'}
           </span>
           <span className="block text-[11px] capitalize text-text-dim">
-            {switching ? 'Switching…' : active?.role ?? 'owner'}
+            {deleting ? 'Deleting…' : switching ? 'Switching…' : active?.role ?? 'owner'}
           </span>
         </span>
         <ChevronsUpDown size={14} className="flex-shrink-0 text-text-dim" aria-hidden />
@@ -121,7 +161,7 @@ export function WorkspaceSwitcher() {
           </ul>
 
           <div className="mt-1 border-t border-border-subtle pt-1">
-            {creating ? (
+            {creatingWs ? (
               <form onSubmit={submitNew} className="p-1">
                 <label htmlFor="new-workspace" className="sr-only">
                   Workspace name
@@ -146,7 +186,7 @@ export function WorkspaceSwitcher() {
                   <button
                     type="button"
                     onClick={() => {
-                      setCreating(false);
+                      setCreatingWs(false);
                       setName('');
                     }}
                     className="rounded-md border border-border px-2 py-1.5 text-xs text-text-muted"
@@ -159,7 +199,7 @@ export function WorkspaceSwitcher() {
               <button
                 type="button"
                 role="menuitem"
-                onClick={() => setCreating(true)}
+                onClick={() => setCreatingWs(true)}
                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-text-muted transition-colors hover:text-text"
               >
                 <Plus size={14} aria-hidden /> New workspace
@@ -177,6 +217,17 @@ export function WorkspaceSwitcher() {
                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-text-muted transition-colors hover:text-text"
               >
                 <Users size={14} aria-hidden /> Manage people
+              </button>
+            )}
+
+            {canDelete && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => void deleteActive()}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-danger/90 transition-colors hover:text-danger"
+              >
+                <Trash2 size={14} aria-hidden /> Delete workspace
               </button>
             )}
           </div>

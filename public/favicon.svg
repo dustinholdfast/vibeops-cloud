@@ -1,17 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
   <defs>
-    <linearGradient id="vGrad" x1="16" y1="12" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#c4b5fd"/>
-      <stop offset="0.45" stop-color="#a78bfa"/>
-      <stop offset="1" stop-color="#7c6cf0"/>
-    </linearGradient>
-    <linearGradient id="lineGrad" x1="22" y1="50" x2="42" y2="50" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#a78bfa" stop-opacity="0.9"/>
-      <stop offset="1" stop-color="#8b7cf6" stop-opacity="0.55"/>
+    <linearGradient id="vFill" x1="18" y1="14" x2="46" y2="52" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ddd6fe"/>
+      <stop offset="0.4" stop-color="#a78bfa"/>
+      <stop offset="1" stop-color="#6d28d9"/>
     </linearGradient>
   </defs>
-  <rect width="64" height="64" rx="14" fill="#0a0a0c"/>
-  <path d="M17 17 L32 48 L47 17 L39.2 17 L32 35.8 L24.8 17 Z" fill="url(#vGrad)"/>
-  <rect x="23" y="51" width="18" height="2.2" rx="1.1" fill="url(#lineGrad)"/>
-  <rect x="26" y="55.5" width="12" height="1.8" rx="0.9" fill="url(#lineGrad)" opacity="0.7"/>
+  <circle cx="32" cy="32" r="30" fill="#12081f"/>
+  <path d="M20 18h9.2L32 40.6 34.8 18H44L32.6 50h-9.2L20 18Z" fill="url(#vFill)"/>
 </svg>

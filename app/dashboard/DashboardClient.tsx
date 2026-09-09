@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { UserButton } from '@clerk/nextjs';
 import { Sidebar } from '@/src/components/Sidebar';
 import { Header } from '@/src/components/Header';
@@ -9,14 +9,16 @@ import { ProjectList } from '@/src/components/ProjectList';
 import { ProjectDrawer } from '@/src/components/ProjectDrawer';
 import { useProjectStore } from '@/src/store/useProjectStore';
 import { WorkspaceSaveNotice } from '@/src/components/SaveStatus';
-import { DailyBrief } from '@/src/components/DailyBrief';
-import { WeeklyReview } from '@/src/components/WeeklyReview';
+import { IntelligenceBand } from '@/src/components/IntelligenceBand';
+import { EmptyWorkspace } from '@/src/components/EmptyWorkspace';
 
 export function DashboardClient({ userId }: { userId: string }) {
   const loadProjects = useProjectStore((s) => s.loadProjects);
   const loadWorkspaces = useProjectStore((s) => s.loadWorkspaces);
   const loadStatus = useProjectStore((s) => s.loadStatus);
   const loadError = useProjectStore((s) => s.loadError);
+  const projects = useProjectStore((s) => s.projects);
+  const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
     void loadProjects(userId);
@@ -35,33 +37,30 @@ export function DashboardClient({ userId }: { userId: string }) {
     return () => window.removeEventListener('beforeunload', warn);
   }, []);
 
-  return (
-    <div className="dashboard flex flex-col md:flex-row h-dvh bg-background text-text overflow-hidden">
-      <Sidebar />
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setNavOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [navOpen]);
 
-      <main className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
+  return (
+    <div className="flex h-full bg-background text-text overflow-hidden">
+      <Sidebar mobileOpen={navOpen} onClose={() => setNavOpen(false)} />
+
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <WorkspaceSaveNotice />
-        <div className="flex items-center justify-end gap-3 px-6 pt-4">
-          <UserButton
-            afterSignOutUrl="/"
-            appearance={{
-              elements: {
-                avatarBox: 'w-8 h-8',
-              },
-            }}
-          />
-        </div>
 
         {loadStatus === 'loading' || loadStatus === 'idle' ? (
           <div className="flex-1 flex items-center justify-center text-sm text-text-dim">
             Loading your workspace…
           </div>
         ) : loadStatus === 'error' ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 text-center">
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 px-4 text-center">
             <p className="text-sm text-danger font-medium">Could not load projects</p>
-            <p className="text-xs text-text-dim max-w-md">
-              {loadError || 'Please try again in a moment.'}
-            </p>
+            <p className="text-xs text-text-dim max-w-md">{loadError || 'Please try again in a moment.'}</p>
             <button
               type="button"
               onClick={() => void loadProjects()}
@@ -72,12 +71,25 @@ export function DashboardClient({ userId }: { userId: string }) {
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2 pb-6">
-              <Header />
-              <DailyBrief />
-              <StatusCards />
-              <WeeklyReview />
-              <ProjectList />
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-5 pb-8">
+              <Header
+                onMenu={() => setNavOpen(true)}
+                account={
+                  <UserButton
+                    afterSignOutUrl="/"
+                    appearance={{ elements: { avatarBox: 'w-8 h-8' } }}
+                  />
+                }
+              />
+              {projects.length === 0 ? (
+                <EmptyWorkspace />
+              ) : (
+                <>
+                  <IntelligenceBand />
+                  <StatusCards />
+                  <ProjectList />
+                </>
+              )}
             </div>
           </div>
         )}

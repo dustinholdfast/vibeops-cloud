@@ -5,13 +5,11 @@ import './globals.css';
 import { DraftSession } from '@/src/components/DraftSession';
 
 export const metadata: Metadata = {
-  title: 'VibeOps Cloud',
+  title: 'Vibe / Ops Cloud',
   description: 'Hosted multi-tenant vibe coding project tracker',
   icons: { icon: '/favicon.svg' },
 };
 
-// Auth/billing routes need a request; also avoids prerender crashing when
-// NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is not present at build time (local/CI).
 export const dynamic = 'force-dynamic';
 
 const THEME_INIT_SCRIPT = `(function () {
@@ -51,7 +49,7 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;650&family=Inter:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
       </head>
@@ -73,9 +71,9 @@ export default function RootLayout({
         baseTheme: dark,
         variables: {
           colorPrimary: '#8b7cf6',
-          colorBackground: '#121214',
-          colorInputBackground: '#1a1a1e',
-          colorInputText: '#f4f4f5',
+          colorBackground: '#11151f',
+          colorInputBackground: '#161b28',
+          colorInputText: '#eceef4',
         },
       }}
     >

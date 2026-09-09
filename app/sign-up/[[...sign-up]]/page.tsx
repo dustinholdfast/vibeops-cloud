@@ -1,4 +1,5 @@
 import { SignUp } from '@clerk/nextjs';
+import { AuthFrame } from '@/src/components/AuthFrame';
 import { AuthUnavailable } from '@/src/components/AuthUnavailable';
 import { isClerkConfigured } from '@/src/lib/auth';
 
@@ -6,15 +7,21 @@ export default function SignUpPage() {
   if (!isClerkConfigured()) return <AuthUnavailable />;
 
   return (
-    <div className="min-h-full flex items-center justify-center px-4">
+    <AuthFrame title="Create account" subtitle="GitHub is the fastest path. Email works too.">
       <SignUp
+        routing="path"
+        path="/sign-up"
+        signInUrl="/sign-in"
+        forceRedirectUrl="/dashboard"
         appearance={{
           elements: {
-            rootBox: 'mx-auto',
-            card: 'bg-surface border border-border shadow-xl',
+            rootBox: 'w-full',
+            card: 'bg-transparent shadow-none border-0 p-0',
+            header: 'hidden',
+            footerAction: 'pt-4',
           },
         }}
       />
-    </div>
+    </AuthFrame>
   );
 }

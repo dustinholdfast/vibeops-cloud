@@ -10,7 +10,6 @@ type Status = {
   status: string;
   projectCount: number;
   projectLimit: number | null;
-  /** False when someone else owns this workspace and its subscription. */
   manageable: boolean;
 };
 
@@ -36,8 +35,12 @@ export function BillingBadge() {
         if (d && d.plan) setStatus(d);
         else setLoadError(true);
       })
-      .catch(() => { if (active) setLoadError(true); });
-    return () => { active = false; };
+      .catch(() => {
+        if (active) setLoadError(true);
+      });
+    return () => {
+      active = false;
+    };
   }, [projectCount, retry, workspaceId]);
 
   const openPortal = async () => {
@@ -59,9 +62,13 @@ export function BillingBadge() {
 
   if (!status) {
     return (
-      <div className="px-4 py-3 border-t border-border-subtle">
+      <div className="px-3 py-2.5">
         <p className="text-[11px] text-text-dim">{loadError ? 'Could not load plan.' : 'Loading plan…'}</p>
-        {loadError && <button type="button" className="text-xs underline" onClick={() => setRetry((n) => n + 1)}>Retry</button>}
+        {loadError && (
+          <button type="button" className="text-[11px] underline" onClick={() => setRetry((n) => n + 1)}>
+            Retry
+          </button>
+        )}
       </div>
     );
   }
@@ -69,25 +76,26 @@ export function BillingBadge() {
   const limitLabel =
     status.projectLimit === null
       ? `${status.projectCount} projects`
-      : `${status.projectCount} / ${status.projectLimit} projects`;
+      : `${status.projectCount} / ${status.projectLimit}`;
 
   return (
-    <div className="px-4 py-3 border-t border-border-subtle space-y-2">
+    <div className="px-3 py-2.5 space-y-1.5">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-text">
+        <span
+          className={
+            status.plan === 'pro'
+              ? 'rounded-full bg-purple/15 px-2 py-0.5 text-[11px] font-medium text-purple-light'
+              : 'rounded-full bg-surface-elevated px-2 py-0.5 text-[11px] font-medium text-text-muted'
+          }
+        >
           {status.plan === 'pro' ? 'Pro' : 'Free'}
         </span>
         <span className="text-[11px] text-text-dim tabular-nums">{limitLabel}</span>
       </div>
       {!status.manageable ? (
-        <p className="text-[11px] text-text-dim">
-          Billing is managed by the workspace owner.
-        </p>
+        <p className="text-[11px] text-text-dim">Billing is managed by the owner.</p>
       ) : status.plan === 'free' ? (
-        <Link
-          href="/pricing"
-          className="block text-center text-xs font-medium text-purple-light hover:underline"
-        >
+        <Link href="/pricing" className="block text-center text-[11px] font-medium text-purple-light hover:underline">
           Upgrade to Pro
         </Link>
       ) : (
@@ -95,7 +103,7 @@ export function BillingBadge() {
           type="button"
           disabled={busy}
           onClick={() => void openPortal()}
-          className="w-full text-xs text-text-dim hover:text-text disabled:opacity-50"
+          className="w-full text-[11px] text-text-dim hover:text-text disabled:opacity-50"
         >
           {busy ? 'Opening…' : 'Manage billing'}
         </button>
