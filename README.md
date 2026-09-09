@@ -110,11 +110,14 @@ Being due is computed per monitor in SQL, so `/api/cron/uptime` is safe to call
 at any frequency and works with any scheduler. Without `?send=1` it is a true
 dry run that writes nothing.
 
-**No schedule ships in `vercel.json`** — Vercel Hobby rejects sub-daily cron
-expressions at deploy time, so wiring one in by default would break deploys on
-that plan. Nothing is checked until you add the Vercel Pro cron entry or point
-an external scheduler at the endpoint. See
-[UPTIME_ROLLOUT.md](./UPTIME_ROLLOUT.md) for both, and for the migration.
+Checks are driven by [`.github/workflows/uptime.yml`](./.github/workflows/uptime.yml)
+on a five-minute schedule, not by Vercel cron: Hobby rejects sub-daily cron
+expressions at deploy time, and a daily check is not monitoring. It needs two
+repository secrets, `APP_URL` and `CRON_SECRET`. On Vercel Pro, prefer a Vercel
+cron entry and disable the workflow.
+
+See [UPTIME_ROLLOUT.md](./UPTIME_ROLLOUT.md) for both, and for the migration —
+which must be applied before any of this does anything.
 
 ---
 

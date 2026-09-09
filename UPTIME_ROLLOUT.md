@@ -8,15 +8,60 @@ Vercel state was touched.
 
 ---
 
-## Nothing is scheduled yet — pick a scheduler
+## The scheduler: GitHub Actions
 
-**`vercel.json` deliberately does not schedule the uptime cron.** Vercel Hobby
-only accepts once-daily cron expressions and rejects anything finer *at deploy
-time*, so shipping a `*/5` entry would have failed the deployment on a Hobby
-plan. Until a scheduler is wired up, monitors are configurable in the UI but
-**nothing is being checked**.
+`vercel.json` deliberately carries **no** uptime cron. Vercel Hobby accepts only
+once-daily cron expressions and rejects anything finer *at deploy time*, so a
+`*/5` entry there would fail the deployment — and a daily check is not
+monitoring.
 
-On **Vercel Pro**, add this back to `vercel.json` and redeploy:
+The scheduler is [`.github/workflows/uptime.yml`](.github/workflows/uptime.yml)
+instead: free on Hobby, five-minute schedule, no extra service.
+
+### Two secrets, then it runs
+
+**Settings → Secrets and variables → Actions → New repository secret**
+
+| Secret | Value |
+| --- | --- |
+| `APP_URL` | The production origin, no trailing path — e.g. `https://your-domain.com` |
+| `CRON_SECRET` | Exactly the value already set in the Vercel environment |
+
+Until both exist the workflow fails fast with a clear message rather than
+silently doing nothing.
+
+### Verify it before trusting it
+
+Run it once by hand: **Actions → Uptime checks → Run workflow**, ticking
+**dry run**. That performs the checks and reports what it found without writing
+anything or emailing anyone. Each run writes a summary table, and any project
+that is not responding appears as a warning annotation.
+
+### What the five minutes actually means
+
+GitHub queues scheduled workflows on shared runners and can run them late or
+skip a tick when busy — treat `*/5` as *roughly* every 5-15 minutes. Also note
+GitHub disables scheduled workflows in a repository with **60 days of no
+activity**; it emails first, and a push re-enables them.
+
+**This only stays free while the repository is public.** Actions minutes are
+unmetered on public repositories. Private ones bill a **minimum of one minute
+per job**, so a five-minute schedule costs ~288 minutes a day and would exhaust
+the 2,000-minute free allowance in about a week. If this repository is ever made
+private, move to a Vercel Pro cron or an external pinger.
+
+If neither is acceptable, the endpoint is scheduler-agnostic and a Cloudflare
+Worker cron trigger, Upstash QStash, or cron-job.org all work the same way:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" \
+  "https://YOUR_DOMAIN/api/cron/uptime?send=1"
+```
+
+### On Vercel Pro
+
+Prefer Vercel cron — it is more punctual. Add this to `vercel.json`, redeploy,
+and disable the GitHub workflow so both are not running:
 
 ```json
 {
@@ -25,20 +70,9 @@ On **Vercel Pro**, add this back to `vercel.json` and redeploy:
 }
 ```
 
-On **Hobby**, leave `vercel.json` alone and drive the endpoint externally.
-
-The endpoint is scheduler-agnostic by design. "Due" is computed per monitor from
-its own interval in SQL, so calling it more often than any monitor needs is
-harmless — it finds nothing to do and returns. Any of these work:
-
-```bash
-curl -H "Authorization: Bearer $CRON_SECRET" \
-  "https://YOUR_DOMAIN/api/cron/uptime?send=1"
-```
-
-- a Cloudflare Worker on a cron trigger
-- GitHub Actions on a `schedule:`
-- Upstash QStash, cron-job.org, or any uptime-style pinger
+"Due" is computed per monitor from its own interval in SQL, so overlapping
+schedulers are harmless — the second one finds nothing to do — but there is no
+reason to pay for both.
 
 ---
 
