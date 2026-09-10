@@ -27,7 +27,10 @@ if (!appUrl) {
     if (
       url.hostname === 'localhost' ||
       url.hostname === '127.0.0.1' ||
-      url.hostname.endsWith('.vercel.app')
+      url.hostname.endsWith('.vercel.app') ||
+      // Clerk production refuses a platform-owned domain, and moving hosts
+      // does not change that: workers.dev is no more usable than vercel.app.
+      url.hostname.endsWith('.workers.dev')
     ) {
       errors.push(
         'NEXT_PUBLIC_APP_URL must use the custom production domain configured in Clerk.'
