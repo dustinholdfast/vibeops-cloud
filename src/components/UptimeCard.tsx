@@ -2,9 +2,21 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Activity, Loader2, RefreshCw, Trash2 } from 'lucide-react';
-import { apiDeleteMonitor, apiGetMonitor, apiSaveMonitor, ApiError } from '../lib/api';
+import {
+  apiCheckMonitorNow,
+  apiDeleteMonitor,
+  apiGetMonitor,
+  apiSaveMonitor,
+  ApiError,
+} from '../lib/api';
 import { cn } from '../lib/utils';
-import type { Project, UptimeBucket, UptimeSnapshot, UptimeWindow } from '../types';
+import type {
+  Project,
+  UptimeBucket,
+  UptimeCheckResult,
+  UptimeSnapshot,
+  UptimeWindow,
+} from '../types';
 
 /**
  * Uptime for one project: the current state, a 24-hour strip, and the numbers
@@ -67,6 +79,8 @@ export function UptimeCard({ project }: { project: Project }) {
   const [error, setError] = useState<string | null>(null);
   const [urlDraft, setUrlDraft] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [result, setResult] = useState<UptimeCheckResult | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -96,6 +110,24 @@ export function UptimeCard({ project }: { project: Project }) {
       setError(err instanceof ApiError ? err.message : 'Could not save the monitor.');
     } finally {
       setBusy(false);
+    }
+  }
+
+  /**
+   * Probes the target now. The snapshot is reloaded afterwards so the strip
+   * and the uptime figures include the check that just ran.
+   */
+  async function checkNow() {
+    setChecking(true);
+    setError(null);
+    try {
+      setResult(await apiCheckMonitorNow(project.id));
+      await load();
+    } catch (err) {
+      setResult(null);
+      setError(err instanceof ApiError ? err.message : 'Could not run that check.');
+    } finally {
+      setChecking(false);
     }
   }
 
@@ -185,12 +217,13 @@ export function UptimeCard({ project }: { project: Project }) {
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => void load()}
-            aria-label="Refresh uptime"
-            title="Refresh"
-            className="rounded-lg p-1.5 text-text-dim transition-colors hover:text-text"
+            onClick={() => void checkNow()}
+            disabled={checking || busy}
+            title="Check this project right now"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs text-text-muted transition-colors hover:text-text disabled:opacity-60"
           >
-            <RefreshCw size={14} aria-hidden />
+            <RefreshCw size={13} className={cn(checking && 'animate-spin')} aria-hidden />
+            {checking ? 'Checking…' : 'Check now'}
           </button>
           <button
             type="button"
@@ -202,6 +235,27 @@ export function UptimeCard({ project }: { project: Project }) {
           </button>
         </div>
       </div>
+
+      {/* The answer to "is it up right now", before the strip below catches up. */}
+      {result?.checkedAt && (
+        <p
+          role="status"
+          className={cn(
+            'rounded-lg border px-3 py-2 text-xs',
+            result.ok
+              ? 'border-success/40 bg-success/5 text-success'
+              : 'border-danger/40 bg-danger/5 text-danger'
+          )}
+        >
+          {result.ok ? 'Responding' : 'Not responding'}
+          {result.statusCode ? ` · HTTP ${result.statusCode}` : ''}
+          {result.ok && result.latencyMs != null ? ` · ${result.latencyMs}ms` : ''}
+          {!result.ok && result.error ? ` · ${result.error}` : ''}
+          {result.alert === 'down' ? ' · marked down' : ''}
+          {result.alert === 'up' ? ' · recovered' : ''}
+          {result.notified ? ` · emailed ${result.notified}` : ''}
+        </p>
+      )}
 
       {/* One column per half hour of the last day. */}
       <div className="flex h-7 items-stretch gap-[2px]" role="img" aria-label="Uptime over the last 24 hours">

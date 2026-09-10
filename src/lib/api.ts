@@ -6,6 +6,7 @@ import type {
   WorkspaceRole,
   UptimeMonitor,
   UptimeSnapshot,
+  UptimeCheckResult,
 } from '@/src/types';
 
 export const WORKSPACE_HEADER = 'x-vibeops-workspace';
@@ -267,4 +268,16 @@ export async function apiDeleteMonitor(projectId: string): Promise<void> {
     credentials: 'include',
   });
   await parseJson<{ deleted?: boolean }>(res);
+}
+
+/**
+ * Checks one project on demand. Returns the probe result; the caller reloads
+ * the snapshot to pick up the new history.
+ */
+export async function apiCheckMonitorNow(projectId: string): Promise<UptimeCheckResult> {
+  const res = await request(`/api/projects/${projectId}/monitor/check`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  return parseJson<UptimeCheckResult>(res);
 }

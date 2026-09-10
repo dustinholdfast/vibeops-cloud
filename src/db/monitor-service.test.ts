@@ -432,6 +432,77 @@ describe('retention', () => {
   });
 });
 
+describe('the manual check', () => {
+  it('returns the monitor in the shape the sweep uses', async () => {
+    await addProject('p1', USER, 'https://example.com/');
+    await service.saveMonitor(scope(USER), 'p1', {});
+
+    const monitor = await service.monitorForCheck(scope(USER), 'p1');
+    assert.equal(monitor.projectId, 'p1');
+    assert.equal(monitor.projectName, 'Project p1');
+    assert.equal(monitor.url, 'https://example.com/');
+    assert.equal(monitor.status, 'unknown');
+  });
+
+  it('refuses when the project is not monitored', async () => {
+    await addProject('p1', USER, 'https://example.com/');
+    await assert.rejects(
+      () => service.monitorForCheck(scope(USER), 'p1'),
+      /not being monitored/
+    );
+  });
+
+  it('refuses a project in another workspace', async () => {
+    await addProject('p1', OTHER, 'https://example.com/');
+    await assert.rejects(() => service.monitorForCheck(scope(USER), 'p1'), /not available/);
+  });
+
+  it('refuses a viewer', async () => {
+    await addProject('p1', TEAM, 'https://example.com/');
+    await service.saveMonitor(scope(TEAM), 'p1', {});
+    await assert.rejects(
+      () => service.monitorForCheck(scope(TEAM, USER, 'viewer'), 'p1'),
+      /view-only/
+    );
+  });
+
+  it('enforces a cooldown so the button cannot hammer the target', async () => {
+    await addProject('p1', USER, 'https://example.com/');
+    await service.saveMonitor(scope(USER), 'p1', {});
+    await service.recordCheck(
+      'p1',
+      { ok: true, statusCode: 200, latencyMs: 20, error: null },
+      { status: 'up', consecutiveFailures: 0, consecutiveSuccesses: 1, alert: null }
+    );
+
+    await assert.rejects(() => service.monitorForCheck(scope(USER), 'p1'), /Just checked/);
+  });
+
+  it('allows a check once the cooldown has passed', async () => {
+    await addProject('p1', USER, 'https://example.com/');
+    await service.saveMonitor(scope(USER), 'p1', {});
+    await service.recordCheck(
+      'p1',
+      { ok: true, statusCode: 200, latencyMs: 20, error: null },
+      { status: 'up', consecutiveFailures: 0, consecutiveSuccesses: 1, alert: null }
+    );
+
+    const later = new Date(Date.now() + service.MANUAL_CHECK_COOLDOWN_MS + 1_000);
+    const monitor = await service.monitorForCheck(scope(USER), 'p1', later);
+    assert.equal(monitor.status, 'up');
+  });
+
+  it('is allowed on a paused monitor, which the sweep would skip', async () => {
+    await addProject('p1', USER, 'https://example.com/');
+    await service.saveMonitor(scope(USER), 'p1', { enabled: false });
+
+    // Pausing stops the schedule; asking directly is still reasonable.
+    const monitor = await service.monitorForCheck(scope(USER), 'p1');
+    assert.equal(monitor.projectId, 'p1');
+    assert.equal((await service.dueMonitors()).length, 0);
+  });
+});
+
 describe('deleting a monitor', () => {
   it('removes the monitor and its history', async () => {
     await addProject('p1', USER, 'https://example.com/');

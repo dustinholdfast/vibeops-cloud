@@ -112,3 +112,17 @@ export type UptimeSnapshot = {
   streakMs?: number | null;
   recent?: UptimeCheck[];
 };
+
+/** The immediate answer from a manual "check now". */
+export type UptimeCheckResult = {
+  available: boolean;
+  checkedAt?: string;
+  ok?: boolean;
+  statusCode?: number | null;
+  latencyMs?: number | null;
+  error?: string | null;
+  status?: MonitorStatus;
+  alert?: 'up' | 'down' | null;
+  /** How many people were emailed, when this check flipped the state. */
+  notified?: number;
+};

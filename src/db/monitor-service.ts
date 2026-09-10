@@ -329,6 +329,63 @@ export async function dueMonitors(now: Date = new Date(), limit = 100): Promise<
   return rows.map((row) => ({ ...row, status: row.status as MonitorStatus }));
 }
 
+/**
+ * The shortest gap allowed between manual checks of one project.
+ *
+ * The button asks our server to fetch somebody else's URL on demand, so
+ * without this it is a way to make VibeOps hammer a third party. Held in the
+ * database rather than in memory because there is no single process to hold it.
+ */
+export const MANUAL_CHECK_COOLDOWN_MS = 15_000;
+
+/**
+ * Loads a monitor for an on-demand check, proving the caller may act on it.
+ *
+ * Mirrors `dueMonitors` in shape so the manual path and the sweep can share
+ * everything downstream of "which monitor, and what state is it in".
+ */
+export async function monitorForCheck(
+  scope: Scope,
+  projectId: string,
+  now: Date = new Date()
+): Promise<DueMonitor> {
+  requireWrite(scope);
+  const project = await requireProject(scope, projectId);
+
+  const [row] = await requireDb()
+    .select()
+    .from(projectMonitors)
+    .where(eq(projectMonitors.projectId, projectId));
+
+  if (!row) {
+    throw new ProjectError(404, 'NOT_FOUND', 'This project is not being monitored yet.');
+  }
+
+  if (
+    row.lastCheckedAt &&
+    now.getTime() - row.lastCheckedAt.getTime() < MANUAL_CHECK_COOLDOWN_MS
+  ) {
+    throw new ProjectError(
+      429,
+      'TOO_MANY_REQUESTS',
+      'Just checked. Give it a few seconds before checking again.'
+    );
+  }
+
+  return {
+    projectId: row.projectId,
+    workspaceId: row.workspaceId,
+    projectName: project.name,
+    url: row.url,
+    timeoutMs: row.timeoutMs,
+    failureThreshold: row.failureThreshold,
+    status: row.status as MonitorStatus,
+    consecutiveFailures: row.consecutiveFailures,
+    consecutiveSuccesses: row.consecutiveSuccesses,
+    lastStatusChangeAt: row.lastStatusChangeAt,
+  };
+}
+
 /** Writes one probe result and the state it produced. */
 export async function recordCheck(
   projectId: string,

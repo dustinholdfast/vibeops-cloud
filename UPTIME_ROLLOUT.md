@@ -3,8 +3,9 @@
 Per-project HTTP checks, 30 days of history, and an email when a project stops
 answering (and another when it comes back).
 
-Nothing here has been deployed, and no production database, Clerk, Stripe or
-Vercel state was touched.
+The code is on `main`. It stays dormant until the migration is applied and the
+secrets below exist — no production database, Clerk or Stripe state has been
+touched.
 
 ---
 
@@ -25,10 +26,18 @@ instead: free on Hobby, five-minute schedule, no extra service.
 | Secret | Value |
 | --- | --- |
 | `APP_URL` | The production origin, no trailing path — e.g. `https://your-domain.com` |
-| `CRON_SECRET` | Exactly the value already set in the Vercel environment |
+| `CRON_SECRET` | The same value as `CRON_SECRET` in the Vercel environment |
 
-Until both exist the workflow fails fast with a clear message rather than
-silently doing nothing.
+`CRON_SECRET` is shared by every `/api/cron/*` route, and the routes refuse to
+run at all when it is unset. If it has never been set, generate one and put the
+same value in both places — Vercel (Production, then redeploy) and here:
+
+```bash
+openssl rand -hex 32
+```
+
+Until both secrets exist the workflow fails fast with a clear message rather
+than silently doing nothing.
 
 ### Verify it before trusting it
 
@@ -161,10 +170,24 @@ uptime alerts off, at their verified primary address. A personal workspace has n
 
 **Unsubscribing is per-list.** Alert emails link to
 `/api/email/unsubscribe?token=…&kind=uptime`, which turns off alerts only and
-leaves the weekly digest alone. Both switches are in the sidebar.
+leaves the weekly digest alone. Both switches live in the workspace menu.
 
 **Retention.** Check rows older than 35 days are pruned on each `send=1` run —
 long enough for the 30-day figure.
+
+**Check now.** The drawer has a manual trigger that probes immediately and
+answers inline. It runs the same pipeline as the sweep — probe, state machine,
+record, alert on a transition — because a person clicking a button and the cron
+waking up are discovering the same fact, and must not produce different history.
+
+That it alerts is deliberate. Recording a check consumes the up/down
+transition, so a manual check that stayed silent would swallow the alert the
+next scheduled run would have sent. Only transitions alert, and a 15-second
+per-project cooldown (`MANUAL_CHECK_COOLDOWN_MS`) stops the button being used
+to hammer somebody else's site through our server.
+
+It works on a paused monitor too — pausing stops the schedule, but asking
+directly is still reasonable.
 
 ---
 
@@ -228,6 +251,8 @@ needs a deployment with `CRON_SECRET` set.
 | `src/db/monitor-service.ts` | storage, tenant scoping, recipients, pruning |
 | `src/lib/email/render-alert.ts` | down and recovery emails |
 | `app/api/projects/[id]/monitor/route.ts` | GET / PUT / DELETE a monitor |
+| `app/api/projects/[id]/monitor/check/route.ts` | the manual "check now" trigger |
+| `src/lib/uptime/alerting.ts` | alert delivery, shared by the sweep and the manual check |
 | `app/api/cron/uptime/route.ts` | the sweep |
 | `src/components/UptimeCard.tsx` | status, 24-hour strip, 24h/7d/30d, settings |
-| `src/components/EmailPreferences.tsx` | replaces `DigestPreference`; both opt-outs |
+| `src/components/WorkspaceMenu.tsx` | the uptime alerts switch, beside the digest one |

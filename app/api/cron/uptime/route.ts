@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { clerkClient } from '@clerk/nextjs/server';
 import {
   alertRecipients,
   dueMonitors,
@@ -8,11 +7,10 @@ import {
   recordCheck,
   type DueMonitor,
 } from '@/src/db/monitor-service';
-import { getOrCreatePreferences } from '@/src/db/digest-service';
 import { applyProbe, type Transition } from '@/src/lib/uptime/status';
 import { probe } from '@/src/lib/uptime/probe';
-import { renderAlert } from '@/src/lib/email/render-alert';
-import { isEmailConfigured, sendEmail } from '@/src/lib/email/send';
+import { sendAlerts } from '@/src/lib/uptime/alerting';
+import { isEmailConfigured } from '@/src/lib/email/send';
 
 /**
  * Runs every monitor that is due.
@@ -88,10 +86,7 @@ async function mapLimit<T, R>(
   return results;
 }
 
-/**
- * Emails everyone who should hear about a state change. Failures are reported
- * but never thrown: one undeliverable address must not stop the sweep.
- */
+/** Emails everyone who should hear about a state change. */
 async function notify(
   monitor: DueMonitor,
   transition: Transition,
@@ -102,52 +97,18 @@ async function notify(
   const kind = transition.alert;
   if (!kind) return [];
 
-  const recipients = await alertRecipients(monitor.workspaceId);
-  if (recipients.length === 0) return [];
-
-  const client = await clerkClient();
-  const { data: users } = await client.users.getUserList({
-    userId: recipients,
-    limit: recipients.length,
+  return sendAlerts({
+    recipients: await alertRecipients(monitor.workspaceId),
+    kind,
+    projectName: monitor.projectName,
+    url: monitor.url,
+    error: outcome.error,
+    downForMs:
+      kind === 'up' && monitor.lastStatusChangeAt
+        ? now.getTime() - monitor.lastStatusChangeAt.getTime()
+        : null,
+    appUrl,
   });
-
-  const downForMs =
-    kind === 'up' && monitor.lastStatusChangeAt
-      ? now.getTime() - monitor.lastStatusChangeAt.getTime()
-      : null;
-
-  const notified: string[] = [];
-
-  for (const user of users) {
-    const address = user.primaryEmailAddress;
-    if (!address?.emailAddress || address.verification?.status !== 'verified') continue;
-
-    const prefs = await getOrCreatePreferences(user.id);
-    const unsubscribeUrl = `${appUrl}/api/email/unsubscribe?token=${prefs.unsubscribeToken}&kind=uptime`;
-
-    const email = renderAlert({
-      kind,
-      projectName: monitor.projectName,
-      url: monitor.url,
-      error: outcome.error,
-      downForMs,
-      appUrl,
-      unsubscribeUrl,
-    });
-
-    const sent = await sendEmail({
-      to: address.emailAddress,
-      subject: email.subject,
-      html: email.html,
-      text: email.text,
-      unsubscribeUrl,
-    });
-
-    if (sent.status === 'sent') notified.push(address.emailAddress);
-    else console.warn('[uptime] alert not delivered', user.id, sent);
-  }
-
-  return notified;
 }
 
 export async function GET(req: Request) {
