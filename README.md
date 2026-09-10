@@ -110,11 +110,12 @@ Being due is computed per monitor in SQL, so `/api/cron/uptime` is safe to call
 at any frequency and works with any scheduler. Without `?send=1` it is a true
 dry run that writes nothing.
 
-Checks are driven by [`.github/workflows/uptime.yml`](./.github/workflows/uptime.yml)
-on a five-minute schedule, not by Vercel cron: Hobby rejects sub-daily cron
-expressions at deploy time, and a daily check is not monitoring. It needs two
-repository secrets, `APP_URL` and `CRON_SECRET`. On Vercel Pro, prefer a Vercel
-cron entry and disable the workflow.
+Checks are driven by [`workers/uptime-cron`](./workers/uptime-cron/README.md), a
+Cloudflare Worker on a five-minute cron trigger — not by Vercel cron, which on
+Hobby rejects sub-daily schedules at deploy time, and not by GitHub Actions,
+which in practice ran twice in seven hours. It needs `APP_URL` and
+`CRON_SECRET` set as Worker secrets. On Vercel Pro, prefer a Vercel cron entry
+and delete the Worker.
 
 See [UPTIME_ROLLOUT.md](./UPTIME_ROLLOUT.md) for both, and for the migration —
 which must be applied before any of this does anything.

@@ -9,68 +9,48 @@ touched.
 
 ---
 
-## The scheduler: GitHub Actions
+## The scheduler: a Cloudflare Worker
 
 `vercel.json` deliberately carries **no** uptime cron. Vercel Hobby accepts only
 once-daily cron expressions and rejects anything finer *at deploy time*, so a
-`*/5` entry there would fail the deployment — and a daily check is not
+five-minute entry there would fail the deployment — and a daily check is not
 monitoring.
 
-The scheduler is [`.github/workflows/uptime.yml`](.github/workflows/uptime.yml)
-instead: free on Hobby, five-minute schedule, no extra service.
+The scheduler is [`workers/uptime-cron`](workers/uptime-cron/README.md), whose
+README covers configuring and deploying it. Two values, neither committed:
 
-### Two secrets, then it runs
+```bash
+npx wrangler secret put APP_URL       # https://your-domain.com
+npx wrangler secret put CRON_SECRET   # must equal CRON_SECRET in the Vercel env
+```
 
-**Settings → Secrets and variables → Actions → New repository secret**
-
-| Secret | Value |
-| --- | --- |
-| `APP_URL` | The production origin, no trailing path — e.g. `https://your-domain.com` |
-| `CRON_SECRET` | The same value as `CRON_SECRET` in the Vercel environment |
-
-`CRON_SECRET` is shared by every `/api/cron/*` route, and the routes refuse to
-run at all when it is unset. If it has never been set, generate one and put the
-same value in both places — Vercel (Production, then redeploy) and here:
+`CRON_SECRET` is shared by every `/api/cron/*` route and they refuse to run
+without it. If it has never been set, generate one and put the same value in
+both places — Vercel (Production, then redeploy) and the Worker:
 
 ```bash
 openssl rand -hex 32
 ```
 
-Until both secrets exist the workflow fails fast with a clear message rather
-than silently doing nothing.
+### It was a GitHub Action first, and that did not work
 
-### Verify it before trusting it
+`.github/workflows/uptime.yml` scheduled this before the Worker did. GitHub's
+scheduled workflows are best-effort on shared runners, and measured here they
+were far worse than that phrase suggests:
 
-Run it once by hand: **Actions → Uptime checks → Run workflow**, ticking
-**dry run**. That performs the checks and reports what it found without writing
-anything or emailing anyone. Each run writes a summary table, and any project
-that is not responding appears as a warning annotation.
-
-### What the five minutes actually means
-
-GitHub queues scheduled workflows on shared runners and can run them late or
-skip a tick when busy — treat `*/5` as *roughly* every 5-15 minutes. Also note
-GitHub disables scheduled workflows in a repository with **60 days of no
-activity**; it emails first, and a push re-enables them.
-
-**This only stays free while the repository is public.** Actions minutes are
-unmetered on public repositories. Private ones bill a **minimum of one minute
-per job**, so a five-minute schedule costs ~288 minutes a day and would exhaust
-the 2,000-minute free allowance in about a week. If this repository is ever made
-private, move to a Vercel Pro cron or an external pinger.
-
-If neither is acceptable, the endpoint is scheduler-agnostic and a Cloudflare
-Worker cron trigger, Upstash QStash, or cron-job.org all work the same way:
-
-```bash
-curl -H "Authorization: Bearer $CRON_SECRET" \
-  "https://YOUR_DOMAIN/api/cron/uptime?send=1"
 ```
+workflow registered   2026-09-09 22:54Z
+run 1                 2026-09-10 00:56Z   (+2h 02m)
+run 2                 2026-09-10 05:48Z   (+4h 52m)
+```
+
+Two runs in seven hours where roughly 84 were due. The workflow has been
+removed; do not reach for it again.
 
 ### On Vercel Pro
 
-Prefer Vercel cron — it is more punctual. Add this to `vercel.json`, redeploy,
-and disable the GitHub workflow so both are not running:
+A Vercel cron would work and be one less moving part. Add this to
+`vercel.json`, redeploy, and delete the Worker so both are not running:
 
 ```json
 {
@@ -80,8 +60,8 @@ and disable the GitHub workflow so both are not running:
 ```
 
 "Due" is computed per monitor from its own interval in SQL, so overlapping
-schedulers are harmless — the second one finds nothing to do — but there is no
-reason to pay for both.
+schedulers are harmless — the second finds nothing to do — but there is no
+reason to run both.
 
 ---
 

@@ -1,0 +1,21 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "vibeops-uptime-cron",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-04",
+
+  // Cloudflare honours this. GitHub Actions does not — see the README.
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
+
+  // APP_URL is not sensitive, but it differs per deployment, so it is set with
+  // `wrangler secret put APP_URL` rather than committed here. Uncomment and
+  // fill this in instead if you would rather keep it in the repo.
+  // "vars": { "APP_URL": "https://your-domain.com" },
+
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+}
