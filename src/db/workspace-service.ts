@@ -1,5 +1,6 @@
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { requireDb } from './index';
+import { dropMonitoringFor } from './project-service';
 import { projects, workspaceInvites, workspaceMembers, workspaces } from './schema';
 import { ProjectError, validateId } from '../lib/project-validation';
 import {
@@ -293,6 +294,17 @@ export async function deleteWorkspace(userId: string, workspaceId: string) {
 
   const id = membership.workspaceId;
   await workspaceTransaction(id, async (tx) => {
+    // Every project here is going, so its monitoring goes with it. Nothing
+    // else would ever remove these rows: the schema has no foreign keys.
+    const doomed = await tx
+      .select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.workspaceId, id));
+    await dropMonitoringFor(
+      tx,
+      doomed.map((row) => row.id)
+    );
+
     await tx.delete(projects).where(eq(projects.workspaceId, id));
     await tx.delete(workspaceInvites).where(eq(workspaceInvites.workspaceId, id));
     await tx.delete(workspaceMembers).where(eq(workspaceMembers.workspaceId, id));

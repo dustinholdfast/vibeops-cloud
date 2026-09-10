@@ -1,6 +1,6 @@
-import { and, desc, eq, inArray, ne } from 'drizzle-orm';
+import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import { requireDb } from './index';
-import { projects, subscriptions } from './schema';
+import { projectChecks, projectMonitors, projects, subscriptions } from './schema';
 import { dbProjectToDomain, domainToDbInsert } from './map';
 import { projectTransaction, type Transaction } from './project-transaction';
 import { resolvePlan, projectLimitFor } from '../lib/plans';
@@ -156,6 +156,35 @@ export async function createProject(scope: Scope, input: unknown) {
 }
 
 /**
+ * Removes the monitor and check history belonging to projects that no longer
+ * exist.
+ *
+ * There are no foreign keys in this schema, so nothing removes these rows on
+ * its own; without this a deleted project's monitor and its month of history
+ * stay forever. Nothing keeps pinging — `dueMonitors` inner-joins `projects`,
+ * so a monitor with no project is never due — but the rows accumulate.
+ *
+ * Guarded by `to_regclass` because the uptime migration is optional: every
+ * other entry point treats its absence as "not set up", and deleting a project
+ * must not become the one operation that fails without it. `to_regclass`
+ * returns null for a missing table rather than raising, which matters inside a
+ * transaction, where a raised error would abort the delete as well.
+ */
+export async function dropMonitoringFor(tx: Transaction, projectIds: string[]) {
+  if (projectIds.length === 0) return;
+
+  const present = await tx.execute(
+    sql`select to_regclass('public.project_monitors') is not null as present`
+  );
+  const ready = (present as unknown as { present: boolean }[])[0]?.present;
+  if (!ready) return;
+
+  // Checks first: they are the child rows, and the order costs nothing.
+  await tx.delete(projectChecks).where(inArray(projectChecks.projectId, projectIds));
+  await tx.delete(projectMonitors).where(inArray(projectMonitors.projectId, projectIds));
+}
+
+/**
  * Replaces the whole workspace in one transaction. The caller sends the versions
  * it believes are current; any drift means someone else wrote in between and the
  * import is refused before anything is deleted.
@@ -202,6 +231,20 @@ export async function importProjects(scope: Scope, input: unknown) {
 
     // Reusing an id keeps its version climbing so other tabs still detect drift.
     const previous = new Map(existing.map((row) => [row.id, row.version]));
+
+    /**
+     * Only projects the import actually drops lose their monitoring. An import
+     * replaces the whole workspace, but an export keeps ids, so re-importing
+     * one is the same project arriving again — wiping its monitor and its
+     * month of history would be a surprising cost for a round trip through a
+     * JSON file.
+     */
+    const keeping = new Set(list.map((p) => p.id));
+    await dropMonitoringFor(
+      tx,
+      existing.map((row) => row.id).filter((id) => !keeping.has(id))
+    );
+
     await tx.delete(projects).where(eq(projects.workspaceId, workspaceId));
     if (list.length) {
       await tx.insert(projects).values(
@@ -296,6 +339,7 @@ export async function deleteProject(scope: Scope, projectId: string, input: unkn
       );
     }
     await tx.delete(projects).where(and(eq(projects.id, id), eq(projects.workspaceId, workspaceId)));
+    await dropMonitoringFor(tx, [id]);
   });
 
   return { ok: true };

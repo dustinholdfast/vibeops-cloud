@@ -630,6 +630,79 @@ describe('the portfolio view', () => {
   });
 });
 
+describe('cleanup when a project goes away', () => {
+  let projectService: typeof import('./project-service');
+
+  before(async () => {
+    projectService = await import('./project-service');
+  });
+
+  async function monitorRows(projectId: string) {
+    const monitors = await sql`
+      SELECT 1 FROM project_monitors WHERE project_id = ${projectId}
+    `;
+    const checks = await sql`
+      SELECT 1 FROM project_checks WHERE project_id = ${projectId}
+    `;
+    return { monitors: monitors.length, checks: checks.length };
+  }
+
+  async function monitorWithHistory(id: string, workspaceId = USER) {
+    await addProject(id, workspaceId, `https://${id}.example/`);
+    await service.saveMonitor(scope(workspaceId), id, {});
+    await service.recordCheck(
+      id,
+      { ok: true, statusCode: 200, latencyMs: 20, error: null },
+      { status: 'up', consecutiveFailures: 0, consecutiveSuccesses: 1, alert: null }
+    );
+  }
+
+  it('deleting a project removes its monitor and its history', async () => {
+    await monitorWithHistory('p1');
+    assert.deepEqual(await monitorRows('p1'), { monitors: 1, checks: 1 });
+
+    await projectService.deleteProject(scope(USER), 'p1', { version: 1 });
+
+    // No foreign keys exist, so nothing else would ever remove these.
+    assert.deepEqual(await monitorRows('p1'), { monitors: 0, checks: 0 });
+  });
+
+  it('leaves other projects alone', async () => {
+    await monitorWithHistory('p1');
+    await monitorWithHistory('p2');
+
+    await projectService.deleteProject(scope(USER), 'p1', { version: 1 });
+
+    assert.deepEqual(await monitorRows('p2'), { monitors: 1, checks: 1 });
+  });
+
+  it('an import keeps monitoring for a project it retains', async () => {
+    await monitorWithHistory('p1');
+
+    // An export keeps ids, so re-importing one is the same project arriving
+    // again — it must not cost the monitor or its history.
+    await projectService.importProjects(scope(USER), {
+      projects: [{ id: 'p1', name: 'Project p1' }],
+      versions: { p1: 1 },
+    });
+
+    assert.deepEqual(await monitorRows('p1'), { monitors: 1, checks: 1 });
+  });
+
+  it('an import drops monitoring for a project it removes', async () => {
+    await monitorWithHistory('p1');
+    await monitorWithHistory('p2');
+
+    await projectService.importProjects(scope(USER), {
+      projects: [{ id: 'p1', name: 'Project p1' }],
+      versions: { p1: 1, p2: 1 },
+    });
+
+    assert.deepEqual(await monitorRows('p1'), { monitors: 1, checks: 1 });
+    assert.deepEqual(await monitorRows('p2'), { monitors: 0, checks: 0 });
+  });
+});
+
 describe('deleting a monitor', () => {
   it('removes the monitor and its history', async () => {
     await addProject('p1', USER, 'https://example.com/');
