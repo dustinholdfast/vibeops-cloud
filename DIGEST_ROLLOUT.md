@@ -9,7 +9,9 @@ the Review panel can never disagree.
 **1. Apply the migration first.**
 
 ```bash
-psql "$PRODUCTION_DATABASE_URL" -f scripts/email-preferences.sql
+DATABASE_URL="…" npm run db:apply email-preferences.sql
+
+# PowerShell:  $env:DATABASE_URL="…"; npm run db:apply email-preferences.sql
 ```
 
 Unlike the workspaces migration, an unapplied migration here **cannot break the

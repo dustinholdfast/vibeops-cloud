@@ -22,19 +22,50 @@ in Worker secrets.
 
 ---
 
+## 0. Work in the right directory
+
+There are two clones of this repository:
+
+| Path | State |
+| --- | --- |
+| `E:\Projects\vibeops-cloud` | **current** |
+| `E:\Projects\VibeOps Cloud\vibeops-cloud` | stale, at `2b90f04` |
+
+The stale one predates uptime monitoring and the whole Cloudflare move. Nothing
+below exists in it.
+
 ## 1. A Neon branch, not the production database
 
 Create a branch in the Neon console. Use its **pooled** connection string, the
 host containing `-pooler`.
 
-Then apply the migrations to it, in this order:
+Then set up its schema. `psql` is not required — the project can do this
+itself:
+
+```powershell
+$env:DATABASE_URL="postgres://…-pooler…/neondb?sslmode=require"
+npm run db:setup
+```
 
 ```bash
-psql "$BRANCH_URL" -f scripts/reliable-saves.sql
-psql "$BRANCH_URL" -f scripts/team-workspaces.sql
-psql "$BRANCH_URL" -f scripts/email-preferences.sql
-psql "$BRANCH_URL" -f scripts/uptime-monitors.sql
+DATABASE_URL="postgres://…-pooler…" npm run db:setup
 ```
+
+Note the `$env:` prefix in PowerShell. A bare `$DATABASE_URL` expands to
+nothing, and the command would run against no database at all.
+
+**Two steps, and the order matters.** `db:setup` runs both:
+
+1. `drizzle-kit push` creates the tables from `src/db/schema.ts`. The SQL files
+   *alter* those tables; none of them creates `projects`, so running them first
+   fails with `relation "projects" does not exist`.
+2. `npm run db:apply` then applies the four SQL migrations in dependency order,
+   which cover what Drizzle deliberately does not — notably the `uptime_alerts`
+   column, kept out of the Drizzle schema so that a missing migration cannot
+   break the existing digest queries.
+
+If the branch was copied from a database that already has the schema, run
+`npm run db:apply` on its own. Every migration is safe to rerun.
 
 ## 2. Build-time values
 

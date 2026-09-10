@@ -18,7 +18,9 @@
     "test": "tsx --test \"src/lib/**/*.test.ts\" \"src/store/*.test.ts\"",
     "test:db": "node scripts/test-db.mjs",
     "typecheck:tests": "tsc -p tsconfig.test.json --noEmit",
-    "check:production-auth": "node scripts/check-production-auth.mjs"
+    "check:production-auth": "node scripts/check-production-auth.mjs",
+    "db:apply": "node scripts/apply-migrations.mjs",
+    "db:setup": "drizzle-kit push --force && node scripts/apply-migrations.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.12.0",

@@ -68,7 +68,10 @@ reason to run both.
 ## Apply the migration before deploying
 
 ```bash
-psql "$DATABASE_URL" -f scripts/uptime-monitors.sql
+DATABASE_URL="…" npm run db:apply uptime-monitors.sql
+
+# PowerShell:  $env:DATABASE_URL="…"; npm run db:apply uptime-monitors.sql
+# psql works too, if you have it installed — this project does not require it.
 ```
 
 Additive and safe to rerun. It creates `project_monitors` and `project_checks`,
@@ -199,11 +202,23 @@ platform's `fetch` does not expose.
 ## Tests
 
 ```powershell
-npm test              # 102 pass, including 3 new uptime suites
+npm test              # 120 pass, no database needed
 npm run typecheck
 npm run typecheck:tests
 npm run build
 ```
+
+Against a real PostgreSQL — 81 pass, 46 of them for monitoring:
+
+```powershell
+docker run --rm -e POSTGRES_PASSWORD=test -p 55432:5432 postgres:17
+$env:TEST_DATABASE_URL="postgres://postgres:test@127.0.0.1:55432/postgres"
+npm run test:db
+```
+
+Worth running. On their first execution they found that `dueMonitors` bound a
+raw `Date`, which meant the scheduled sweep had never once worked, in any
+environment, with any data.
 
 New pure-logic suites, no network or database needed:
 
