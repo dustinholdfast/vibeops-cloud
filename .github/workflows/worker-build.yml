@@ -1,0 +1,64 @@
+name: Worker build
+
+# Builds the Cloudflare Worker bundle on Linux.
+#
+# OpenNext says of itself that it is not fully compatible with Windows and
+# "could encounter unpredictable failures during runtime". Development happens
+# on Windows, so this is where a production-shaped bundle actually gets built
+# and where a break in it gets noticed.
+#
+# It does not deploy. Deployment needs an account token and a decision about
+# which environment, both of which belong to a person.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: worker-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: |
+          npm run typecheck
+          npm run typecheck:tests
+
+      # Runs in UTC here and in local time on a developer's machine. That
+      # difference is exactly what the rotting test used to get wrong, so it is
+      # worth having both.
+      - name: Unit tests
+        run: npm test
+
+      - name: Build the Worker bundle
+        env:
+          # NEXT_PUBLIC_* values are inlined by Next at build time, so they must
+          # exist here, not only as Worker secrets. These are placeholders: this
+          # job proves the bundle builds, it does not produce a deployable
+          # artifact. A real build needs the real values.
+          NEXT_PUBLIC_APP_URL: https://example.invalid
+        run: npm run build:worker
+
+      - name: Check the bundle exists
+        run: |
+          test -f .open-next/worker.js || { echo "::error::no worker bundle produced"; exit 1; }
+          echo "bundle: $(du -h .open-next/worker.js | cut -f1)"

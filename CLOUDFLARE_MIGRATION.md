@@ -118,9 +118,17 @@ with a hosting change.
 3. Add the production custom domain to the Worker only after they pass.
 4. Move DNS. Keep the Vercel deployment for rollback and watch auth, database,
    billing and 5xx rates.
-5. Delete the `vercel.json` cron and `workers/uptime-cron` only once the app is
-   on Workers, where a Cloudflare cron trigger in the app's own
-   `wrangler.jsonc` can replace both.
+5. Delete the `vercel.json` cron once nothing is served from Vercel.
+
+**Keep `workers/uptime-cron` as a separate Worker.** Folding the schedule into
+the app's own `wrangler.jsonc` looks tidier and does not work: the OpenNext
+bundle exports only `fetch`, with no `scheduled` handler, so a cron trigger on
+it would fail on every invocation. Replacing the entry point to add one means
+owning a wrapper around generated code for no benefit.
+
+Separate is also simply better here. The scheduler survives app redeploys, does
+not depend on OpenNext's entry shape, and can point at Vercel or Workers by
+changing one secret — which is exactly what a cutover needs.
 
 ### What I could verify locally
 
