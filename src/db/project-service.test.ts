@@ -185,11 +185,30 @@ const countFor = async (workspaceId: string) => {
   return rows[0].n;
 };
 
+/**
+ * Applies schema SQL on a reserved connection.
+ *
+ * The migration files wrap themselves in `BEGIN; … COMMIT;`, which is right for
+ * `psql -f` but which postgres.js refuses on a pooled connection: it cannot
+ * know which pooled socket the later statements would land on, so it raises
+ * UNSAFE_TRANSACTION. Reserving one connection is one of the three paths it
+ * sanctions, and it leaves the pool alone for the lock-contention tests, which
+ * is why this is not simply `max: 1`.
+ */
+async function applySql(text: string) {
+  const reserved = await sql.reserve();
+  try {
+    await reserved.unsafe(text);
+  } finally {
+    reserved.release();
+  }
+}
+
 before(async () => {
   sql = postgres(url, { prepare: false, max: 8 });
-  await sql.unsafe(LEGACY_SCHEMA);
-  await sql.unsafe(readFileSync('scripts/reliable-saves.sql', 'utf8'));
-  await sql.unsafe(readFileSync('scripts/team-workspaces.sql', 'utf8'));
+  await applySql(LEGACY_SCHEMA);
+  await applySql(readFileSync('scripts/reliable-saves.sql', 'utf8'));
+  await applySql(readFileSync('scripts/team-workspaces.sql', 'utf8'));
   service = await import('./project-service');
   ProjectError = (await import('../lib/project-validation')).ProjectError;
 });
@@ -205,7 +224,7 @@ beforeEach(async () => {
 
 describe('migration', () => {
   it('adds the reliability columns and is safe to rerun', async () => {
-    await sql.unsafe(readFileSync('scripts/reliable-saves.sql', 'utf8'));
+    await applySql(readFileSync('scripts/reliable-saves.sql', 'utf8'));
     const columns = await sql<{ column_name: string; column_default: string | null }[]>`
       SELECT column_name, column_default FROM information_schema.columns
       WHERE table_name = 'projects' AND column_name IN ('version', 'last_mutation_id')
@@ -600,7 +619,7 @@ describe('tenant isolation', () => {
 
 describe('workspace scoping', () => {
   it('applies the team-workspaces migration and is safe to rerun', async () => {
-    await sql.unsafe(readFileSync('scripts/team-workspaces.sql', 'utf8'));
+    await applySql(readFileSync('scripts/team-workspaces.sql', 'utf8'));
 
     const [column] = await sql<{ is_nullable: string }[]>`
       SELECT is_nullable FROM information_schema.columns
@@ -625,7 +644,7 @@ describe('workspace scoping', () => {
       VALUES ('legacy2', ${USER}, ${USER}, 'Legacy', now(), now(), now())
     `;
     // Re-running the migration must leave an already-scoped row alone.
-    await sql.unsafe(readFileSync('scripts/team-workspaces.sql', 'utf8'));
+    await applySql(readFileSync('scripts/team-workspaces.sql', 'utf8'));
 
     const [row] = await sql<{ workspace_id: string }[]>`
       SELECT workspace_id FROM projects WHERE id = 'legacy2'

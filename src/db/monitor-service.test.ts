@@ -72,6 +72,25 @@ const BASE_SCHEMA = `
   );
 `;
 
+/**
+ * Applies schema SQL on a reserved connection.
+ *
+ * The migration files wrap themselves in `BEGIN; … COMMIT;`, which is right for
+ * `psql -f` but which postgres.js refuses on a pooled connection: it cannot
+ * know which pooled socket the later statements would land on, so it raises
+ * UNSAFE_TRANSACTION. Reserving one connection is one of the three paths it
+ * sanctions, and it leaves the pool alone for the concurrency tests, which is
+ * why this is not simply `max: 1`.
+ */
+async function applySql(text: string) {
+  const reserved = await sql.reserve();
+  try {
+    await reserved.unsafe(text);
+  } finally {
+    reserved.release();
+  }
+}
+
 async function addProject(id: string, workspaceId: string, liveUrl: string | null = null) {
   await sql`
     INSERT INTO projects (id, workspace_id, user_id, name, live_url)
@@ -90,10 +109,10 @@ async function lastCheckedSecondsAgo(projectId: string, seconds: number) {
 
 before(async () => {
   sql = postgres(url, { prepare: false, max: 8 });
-  await sql.unsafe(BASE_SCHEMA);
-  await sql.unsafe(readFileSync('scripts/team-workspaces.sql', 'utf8'));
-  await sql.unsafe(readFileSync('scripts/email-preferences.sql', 'utf8'));
-  await sql.unsafe(readFileSync('scripts/uptime-monitors.sql', 'utf8'));
+  await applySql(BASE_SCHEMA);
+  await applySql(readFileSync('scripts/team-workspaces.sql', 'utf8'));
+  await applySql(readFileSync('scripts/email-preferences.sql', 'utf8'));
+  await applySql(readFileSync('scripts/uptime-monitors.sql', 'utf8'));
   service = await import('./monitor-service');
 });
 
@@ -108,7 +127,7 @@ beforeEach(async () => {
 
 describe('the migration', () => {
   it('creates both tables and the alerts column, and is safe to rerun', async () => {
-    await sql.unsafe(readFileSync('scripts/uptime-monitors.sql', 'utf8'));
+    await applySql(readFileSync('scripts/uptime-monitors.sql', 'utf8'));
 
     const tables = await sql<{ table_name: string }[]>`
       SELECT table_name FROM information_schema.tables

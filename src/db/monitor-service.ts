@@ -325,11 +325,21 @@ export async function dueMonitors(now: Date = new Date(), limit = 100): Promise<
         eq(projectMonitors.enabled, 1),
         or(
           isNull(projectMonitors.lastCheckedAt),
-          // The cast is load-bearing: without it Postgres cannot infer the
-          // parameter's type and the subtraction fails to resolve an operator.
+          /**
+           * The string and the cast are both load-bearing.
+           *
+           * A raw `Date` cannot be interpolated here: drizzle hands parameters
+           * to postgres.js through its `unsafe` path, which serialises nothing
+           * and fails on a Date with "the string argument must be of type
+           * string". A column comparison would have carried the type mapping
+           * that avoids this; a bare fragment has none.
+           *
+           * The cast then gives Postgres the type it cannot otherwise infer,
+           * without which the subtraction resolves no operator.
+           */
           lte(
             projectMonitors.lastCheckedAt,
-            sql`${now}::timestamptz - make_interval(secs => ${projectMonitors.intervalSeconds})`
+            sql`${now.toISOString()}::timestamptz - make_interval(secs => ${projectMonitors.intervalSeconds})`
           )
         )
       )
