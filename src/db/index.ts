@@ -26,13 +26,64 @@ type Database = ReturnType<typeof drizzle>;
 let client: Client | null = null;
 let database: Database | null = null;
 
+/**
+ * Adjusts a connection string for what this driver and runtime actually
+ * support. Returns it unchanged when there is nothing to fix.
+ *
+ * Both cases below come from strings copied verbatim out of Neon's console,
+ * which is the normal way anyone configures this.
+ */
+export function normaliseConnectionString(raw: string, workers = onWorkers): string {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    // Not our problem to diagnose; let the driver report it.
+    return raw;
+  }
+
+  let changed = false;
+
+  /**
+   * `channel_binding` is a libpq option postgres.js does not implement. Rather
+   * than ignore it, postgres.js forwards unknown parameters to the server in
+   * the startup packet, and Postgres rejects the connection outright with
+   * `unrecognized configuration parameter "channel_binding"`.
+   *
+   * Dropping it does not send anything in clear: the channel is still
+   * TLS-protected by sslmode. What is lost is the binding of authentication to
+   * that specific channel, which postgres.js cannot honour under any spelling.
+   */
+  if (url.searchParams.has('channel_binding')) {
+    url.searchParams.delete('channel_binding');
+    changed = true;
+  }
+
+  /**
+   * On Workers, `sslmode=require` cannot connect at all.
+   *
+   * postgres.js implements it by passing `rejectUnauthorized: false`, and
+   * workerd's node:tls shim answers `ERR_OPTION_NOT_IMPLEMENTED` — the TLS
+   * handshake never starts. `verify-full` passes no such option and does
+   * connect, and is the stricter setting of the two, so nothing is traded away
+   * by preferring it here.
+   */
+  if (workers && url.searchParams.get('sslmode') === 'require') {
+    url.searchParams.set('sslmode', 'verify-full');
+    changed = true;
+  }
+
+  return changed ? url.toString() : raw;
+}
+
 export function requireDb(): Database {
   if (database) return database;
 
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
+  const raw = process.env.DATABASE_URL;
+  if (!raw) {
     throw new Error('DATABASE_URL is not configured');
   }
+  const connectionString = normaliseConnectionString(raw);
 
   client = postgres(connectionString, {
     /**

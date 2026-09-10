@@ -15,7 +15,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "test": "tsx --test \"src/lib/**/*.test.ts\" \"src/store/*.test.ts\"",
+    "test": "tsx --test \"src/lib/**/*.test.ts\" \"src/store/*.test.ts\" \"src/db/connection-string.test.ts\"",
     "test:db": "node scripts/test-db.mjs",
     "typecheck:tests": "tsc -p tsconfig.test.json --noEmit",
     "check:production-auth": "node scripts/check-production-auth.mjs",
