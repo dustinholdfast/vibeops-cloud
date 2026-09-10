@@ -126,3 +126,26 @@ export type UptimeCheckResult = {
   /** How many people were emailed, when this check flipped the state. */
   notified?: number;
 };
+
+/** One project's row in the portfolio uptime view. */
+export type UptimeRow = {
+  projectId: string;
+  projectName: string;
+  url: string;
+  status: MonitorStatus;
+  enabled: boolean;
+  lastCheckedAt: string | null;
+  lastError: string | null;
+  intervalSeconds: number;
+  windows: { day: UptimeWindow; week: UptimeWindow; month: UptimeWindow };
+  /** Oldest first, so the strip reads left to right like a timeline. */
+  buckets: UptimeBucket[];
+};
+
+export type WorkspaceUptime = {
+  /** False when the monitoring migration has not been applied. */
+  available: boolean;
+  monitored: UptimeRow[];
+  /** Projects with no monitor yet, so the page can offer to add one. */
+  unmonitored: { id: string; name: string; liveUrl: string | null }[];
+};

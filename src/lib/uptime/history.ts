@@ -31,6 +31,21 @@ export type UptimeSummary = {
   avgLatencyMs: number | null;
 };
 
+/**
+ * The one definition of the uptime percentage.
+ *
+ * Shared by the in-memory summary and the SQL-aggregated portfolio view, which
+ * count the same checks by different means and must not disagree by a decimal.
+ *
+ * One decimal place is the useful precision, and it floors rather than rounds:
+ * showing a clean 100% while a failure sits in the window would be a lie.
+ * Null when nothing was checked — that is not the same as 0%.
+ */
+export function uptimeFromCounts(checks: number, failures: number): number | null {
+  if (checks <= 0) return null;
+  return Math.floor(((checks - failures) / checks) * 1000) / 10;
+}
+
 function windowed(records: CheckRecord[], from: Date, to: Date): CheckRecord[] {
   return records.filter(
     (record) => record.checkedAt >= from && record.checkedAt < to
@@ -64,9 +79,7 @@ export function summarise(
   return {
     checks,
     failures,
-    // One decimal place: "99.9%" is the useful precision, and rounding up to a
-    // clean 100% while a failure sits in the window would be a lie.
-    uptimePct: Math.floor(((checks - failures) / checks) * 1000) / 10,
+    uptimePct: uptimeFromCounts(checks, failures),
     avgLatencyMs,
   };
 }

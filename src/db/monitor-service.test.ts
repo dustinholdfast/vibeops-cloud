@@ -503,6 +503,133 @@ describe('the manual check', () => {
   });
 });
 
+describe('the portfolio view', () => {
+  const now = new Date('2026-09-09T12:00:00.000Z');
+
+  /** Inserts a check at a fixed distance before `now`. */
+  async function checkAt(projectId: string, minutesAgo: number, ok: boolean, latency = 100) {
+    await sql`
+      INSERT INTO project_checks (project_id, checked_at, ok, latency_ms)
+      VALUES (${projectId}, ${new Date(now.getTime() - minutesAgo * 60_000)}, ${ok ? 1 : 0}, ${latency})
+    `;
+  }
+
+  it('splits monitored from unmonitored projects', async () => {
+    await addProject('p1', USER, 'https://one.example/');
+    await addProject('p2', USER, 'https://two.example/');
+    await service.saveMonitor(scope(USER), 'p1', {});
+
+    const view = await service.listWorkspaceUptime(scope(USER), now);
+    assert.deepEqual(
+      view.monitored.map((row) => row.projectId),
+      ['p1']
+    );
+    assert.deepEqual(
+      view.unmonitored.map((row) => row.id),
+      ['p2']
+    );
+  });
+
+  it('does not leak another workspace', async () => {
+    await addProject('mine', USER, 'https://mine.example/');
+    await addProject('theirs', OTHER, 'https://theirs.example/');
+    await service.saveMonitor(scope(USER), 'mine', {});
+    await service.saveMonitor(scope(OTHER, OTHER), 'theirs', {});
+
+    const view = await service.listWorkspaceUptime(scope(USER), now);
+    assert.deepEqual(
+      view.monitored.map((row) => row.projectId),
+      ['mine']
+    );
+    assert.equal(view.unmonitored.length, 0);
+  });
+
+  it('aggregates each window independently', async () => {
+    await addProject('p1', USER, 'https://one.example/');
+    await service.saveMonitor(scope(USER), 'p1', {});
+
+    await checkAt('p1', 30, true); // in all three windows
+    await checkAt('p1', 60, false); // in all three windows
+    await checkAt('p1', 60 * 48, true); // 2 days: week and month only
+    await checkAt('p1', 60 * 24 * 20, false); // 20 days: month only
+
+    const [row] = (await service.listWorkspaceUptime(scope(USER), now)).monitored;
+
+    assert.equal(row.windows.day.checks, 2);
+    assert.equal(row.windows.day.failures, 1);
+    assert.equal(row.windows.day.uptimePct, 50);
+
+    assert.equal(row.windows.week.checks, 3);
+    assert.equal(row.windows.week.failures, 1);
+
+    assert.equal(row.windows.month.checks, 4);
+    assert.equal(row.windows.month.failures, 2);
+    assert.equal(row.windows.month.uptimePct, 50);
+  });
+
+  it('averages latency over successful checks in the last day only', async () => {
+    await addProject('p1', USER, 'https://one.example/');
+    await service.saveMonitor(scope(USER), 'p1', {});
+
+    await checkAt('p1', 10, true, 100);
+    await checkAt('p1', 20, true, 300);
+    await checkAt('p1', 30, false, 9999); // failures must not skew it
+    await checkAt('p1', 60 * 48, true, 9999); // outside the day window
+
+    const [row] = (await service.listWorkspaceUptime(scope(USER), now)).monitored;
+    assert.equal(row.windows.day.avgLatencyMs, 200);
+  });
+
+  it('returns 48 buckets, oldest first, with checks in the right slot', async () => {
+    await addProject('p1', USER, 'https://one.example/');
+    await service.saveMonitor(scope(USER), 'p1', {});
+
+    await checkAt('p1', 10, false); // most recent half hour → last bucket
+    await checkAt('p1', 23 * 60 + 50, true); // nearly 24h ago → first bucket
+
+    const [row] = (await service.listWorkspaceUptime(scope(USER), now)).monitored;
+
+    assert.equal(row.buckets.length, 48);
+    assert.ok(
+      new Date(row.buckets[0].start) < new Date(row.buckets[47].start),
+      'oldest first'
+    );
+    assert.equal(row.buckets[47].state, 'down', 'the recent failure lands last');
+    assert.equal(row.buckets[0].state, 'up', 'the day-old success lands first');
+    assert.equal(
+      row.buckets.filter((bucket) => bucket.state === 'none').length,
+      46,
+      'every other slot is empty, not down'
+    );
+  });
+
+  it('reports a project with no checks as unknown rather than 0%', async () => {
+    await addProject('p1', USER, 'https://one.example/');
+    await service.saveMonitor(scope(USER), 'p1', {});
+
+    const [row] = (await service.listWorkspaceUptime(scope(USER), now)).monitored;
+    assert.equal(row.status, 'unknown');
+    assert.equal(row.windows.day.uptimePct, null);
+    assert.equal(row.windows.day.checks, 0);
+    assert.equal(row.buckets.length, 48);
+  });
+
+  it('agrees with the single-project snapshot', async () => {
+    await addProject('p1', USER, 'https://one.example/');
+    await service.saveMonitor(scope(USER), 'p1', {});
+    await checkAt('p1', 10, true);
+    await checkAt('p1', 20, false);
+    await checkAt('p1', 30, true);
+
+    const [row] = (await service.listWorkspaceUptime(scope(USER), now)).monitored;
+    const snapshot = await service.getMonitorSnapshot(scope(USER), 'p1', now);
+
+    // Two different code paths count the same checks; they must not disagree.
+    assert.equal(row.windows.day.uptimePct, snapshot.windows.day.uptimePct);
+    assert.equal(row.windows.day.checks, snapshot.windows.day.checks);
+  });
+});
+
 describe('deleting a monitor', () => {
   it('removes the monitor and its history', async () => {
     await addProject('p1', USER, 'https://example.com/');

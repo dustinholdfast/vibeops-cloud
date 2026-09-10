@@ -7,6 +7,7 @@ import type {
   UptimeMonitor,
   UptimeSnapshot,
   UptimeCheckResult,
+  WorkspaceUptime,
 } from '@/src/types';
 
 export const WORKSPACE_HEADER = 'x-vibeops-workspace';
@@ -280,4 +281,10 @@ export async function apiCheckMonitorNow(projectId: string): Promise<UptimeCheck
     credentials: 'include',
   });
   return parseJson<UptimeCheckResult>(res);
+}
+
+/** Every monitor in the active workspace, for the portfolio uptime view. */
+export async function apiListUptime(): Promise<WorkspaceUptime> {
+  const res = await request('/api/monitors', { credentials: 'include' });
+  return parseJson<WorkspaceUptime>(res);
 }

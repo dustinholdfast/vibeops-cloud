@@ -14,6 +14,7 @@ import {
   bucketize,
   currentStreakMs,
   summarise,
+  uptimeFromCounts,
   type Bucket,
   type CheckRecord,
   type UptimeSummary,
@@ -512,6 +513,183 @@ export async function unsubscribeAlertsByToken(token: string): Promise<boolean> 
   `)) as unknown as { user_id: string }[];
 
   return rows.length > 0;
+}
+
+/** Half-hour columns over the last day, matching the drawer's strip. */
+const STRIP_SLOTS = 48;
+const SLOT_SECONDS = 1800;
+
+export type UptimeRow = {
+  projectId: string;
+  projectName: string;
+  url: string;
+  status: MonitorStatus;
+  enabled: boolean;
+  lastCheckedAt: string | null;
+  lastError: string | null;
+  intervalSeconds: number;
+  windows: { day: UptimeSummary; week: UptimeSummary; month: UptimeSummary };
+  /** Oldest first, so the strip reads left to right like a timeline. */
+  buckets: Bucket[];
+};
+
+export type WorkspaceUptime = {
+  monitored: UptimeRow[];
+  /** Projects in the workspace with no monitor yet, so the page can offer them. */
+  unmonitored: { id: string; name: string; liveUrl: string | null }[];
+};
+
+/**
+ * Every monitor in the workspace with its history, for the portfolio view.
+ *
+ * The counting is done in SQL on purpose. At a five-minute interval one
+ * project accumulates ~8,600 checks a month, so loading rows to add them up in
+ * JavaScript would move tens of megabytes to render one page. Two grouped
+ * queries return one row per project instead.
+ */
+export async function listWorkspaceUptime(
+  scope: Scope,
+  now: Date = new Date()
+): Promise<WorkspaceUptime> {
+  const db = requireDb();
+  const workspaceId = scope.workspace.workspaceId;
+
+  const monitors = await db
+    .select({
+      projectId: projectMonitors.projectId,
+      projectName: projects.name,
+      url: projectMonitors.url,
+      status: projectMonitors.status,
+      enabled: projectMonitors.enabled,
+      lastCheckedAt: projectMonitors.lastCheckedAt,
+      lastError: projectMonitors.lastError,
+      intervalSeconds: projectMonitors.intervalSeconds,
+    })
+    .from(projectMonitors)
+    .innerJoin(projects, eq(projects.id, projectMonitors.projectId))
+    .where(eq(projects.workspaceId, workspaceId))
+    .orderBy(projects.name);
+
+  const all = await db
+    .select({ id: projects.id, name: projects.name, liveUrl: projects.liveUrl })
+    .from(projects)
+    .where(eq(projects.workspaceId, workspaceId))
+    .orderBy(projects.name);
+
+  const monitoredIds = monitors.map((row) => row.projectId);
+  const unmonitored = all
+    .filter((project) => !monitoredIds.includes(project.id))
+    .map((project) => ({ id: project.id, name: project.name, liveUrl: project.liveUrl }));
+
+  if (monitoredIds.length === 0) return { monitored: [], unmonitored };
+
+  const monthAgo = new Date(now.getTime() - 30 * DAY_MS);
+  const dayAgo = new Date(now.getTime() - DAY_MS);
+  const weekAgo = new Date(now.getTime() - 7 * DAY_MS);
+  const inScope = and(
+    inArray(projectChecks.projectId, monitoredIds),
+    gte(projectChecks.checkedAt, monthAgo)
+  );
+
+  // Casts are load-bearing: count() is bigint and avg() numeric, both of which
+  // the driver hands back as strings.
+  const totals = await db
+    .select({
+      projectId: projectChecks.projectId,
+      dayChecks: sql<number>`count(*) filter (where ${projectChecks.checkedAt} >= ${dayAgo})::int`,
+      dayFailures: sql<number>`count(*) filter (where ${projectChecks.checkedAt} >= ${dayAgo} and ${projectChecks.ok} = 0)::int`,
+      dayLatency: sql<
+        number | null
+      >`avg(${projectChecks.latencyMs}) filter (where ${projectChecks.checkedAt} >= ${dayAgo} and ${projectChecks.ok} = 1)::float`,
+      weekChecks: sql<number>`count(*) filter (where ${projectChecks.checkedAt} >= ${weekAgo})::int`,
+      weekFailures: sql<number>`count(*) filter (where ${projectChecks.checkedAt} >= ${weekAgo} and ${projectChecks.ok} = 0)::int`,
+      monthChecks: sql<number>`count(*)::int`,
+      monthFailures: sql<number>`count(*) filter (where ${projectChecks.ok} = 0)::int`,
+    })
+    .from(projectChecks)
+    .where(inScope)
+    .groupBy(projectChecks.projectId);
+
+  // Slot 0 is the most recent half hour, counting backwards.
+  const slot = sql<number>`floor(extract(epoch from (${now}::timestamptz - ${projectChecks.checkedAt})) / ${SLOT_SECONDS})::int`;
+
+  const slots = await db
+    .select({
+      projectId: projectChecks.projectId,
+      slot,
+      total: sql<number>`count(*)::int`,
+      failed: sql<number>`count(*) filter (where ${projectChecks.ok} = 0)::int`,
+    })
+    .from(projectChecks)
+    .where(
+      and(inArray(projectChecks.projectId, monitoredIds), gte(projectChecks.checkedAt, dayAgo))
+    )
+    .groupBy(projectChecks.projectId, slot);
+
+  const totalsBy = new Map(totals.map((row) => [row.projectId, row]));
+  const slotsBy = new Map<string, Map<number, { total: number; failed: number }>>();
+  for (const row of slots) {
+    const forProject = slotsBy.get(row.projectId) ?? new Map();
+    forProject.set(Number(row.slot), { total: Number(row.total), failed: Number(row.failed) });
+    slotsBy.set(row.projectId, forProject);
+  }
+
+  function summaryOf(checks: number, failures: number, latency: number | null): UptimeSummary {
+    return {
+      checks,
+      failures,
+      uptimePct: uptimeFromCounts(checks, failures),
+      avgLatencyMs: latency === null ? null : Math.round(latency),
+    };
+  }
+
+  return {
+    unmonitored,
+    monitored: monitors.map((monitor) => {
+      const t = totalsBy.get(monitor.projectId);
+      const forProject = slotsBy.get(monitor.projectId);
+
+      const buckets: Bucket[] = [];
+      // Emitted oldest first so the strip reads as a timeline.
+      for (let index = STRIP_SLOTS - 1; index >= 0; index -= 1) {
+        const counts = forProject?.get(index);
+        const start = new Date(now.getTime() - (index + 1) * SLOT_SECONDS * 1000);
+        const end = new Date(now.getTime() - index * SLOT_SECONDS * 1000);
+        const total = counts?.total ?? 0;
+        const failed = counts?.failed ?? 0;
+
+        buckets.push({
+          start: start.toISOString(),
+          end: end.toISOString(),
+          total,
+          failed,
+          state:
+            total === 0 ? 'none' : failed === 0 ? 'up' : failed === total ? 'down' : 'degraded',
+        });
+      }
+
+      return {
+        projectId: monitor.projectId,
+        projectName: monitor.projectName,
+        url: monitor.url,
+        status: monitor.status as MonitorStatus,
+        enabled: monitor.enabled === 1,
+        lastCheckedAt: monitor.lastCheckedAt?.toISOString() ?? null,
+        lastError: monitor.lastError,
+        intervalSeconds: monitor.intervalSeconds,
+        windows: {
+          day: summaryOf(
+            Number(t?.dayChecks ?? 0),
+            Number(t?.dayFailures ?? 0),
+            t?.dayLatency == null ? null : Number(t.dayLatency)
+          ),
+          week: summaryOf(Number(t?.weekChecks ?? 0), Number(t?.weekFailures ?? 0), null),
+          month: summaryOf(Number(t?.monthChecks ?? 0), Number(t?.monthFailures ?? 0), null),
+        },
+        buckets,
+      };
+    }),
+  };
 }
 
 /** Statuses for a set of projects, for the dashboard list. */
