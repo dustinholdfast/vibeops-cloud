@@ -249,8 +249,13 @@ export function UptimeCard({ project }: { project: Project }) {
         >
           {result.ok ? 'Responding' : 'Not responding'}
           {result.statusCode ? ` · HTTP ${result.statusCode}` : ''}
-          {result.ok && result.latencyMs != null ? ` · ${result.latencyMs}ms` : ''}
-          {!result.ok && result.error ? ` · ${result.error}` : ''}
+          {/* Latency is real whether or not the status was healthy: a 401 came
+              back, and how fast it came back is still worth seeing. */}
+          {result.latencyMs != null ? ` · ${result.latencyMs}ms` : ''}
+          {/* The probe's error for a bad status is just "HTTP <code>", which
+              the line above already said. Only a transport failure — no status
+              at all — carries a reason worth printing. */}
+          {!result.statusCode && result.error ? ` · ${result.error}` : ''}
           {result.alert === 'down' ? ' · marked down' : ''}
           {result.alert === 'up' ? ' · recovered' : ''}
           {result.notified ? ` · emailed ${result.notified}` : ''}
