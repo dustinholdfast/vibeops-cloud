@@ -43,12 +43,12 @@ Then set up its schema. `psql` is not required — the project can do this
 itself:
 
 ```powershell
-$env:DATABASE_URL="postgres://…-pooler…/neondb?sslmode=require"
+$env:DATABASE_URL="<paste the pooled string from the Neon console>"
 npm run db:setup
 ```
 
 ```bash
-DATABASE_URL="postgres://…-pooler…" npm run db:setup
+DATABASE_URL="<paste the pooled string from the Neon console>" npm run db:setup
 ```
 
 Note the `$env:` prefix in PowerShell. A bare `$DATABASE_URL` expands to

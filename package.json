@@ -20,7 +20,7 @@
     "typecheck:tests": "tsc -p tsconfig.test.json --noEmit",
     "check:production-auth": "node scripts/check-production-auth.mjs",
     "db:apply": "node scripts/apply-migrations.mjs",
-    "db:setup": "drizzle-kit push --force && node scripts/apply-migrations.mjs"
+    "db:setup": "node scripts/apply-migrations.mjs --push"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.12.0",

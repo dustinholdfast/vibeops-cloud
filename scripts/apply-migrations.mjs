@@ -2,8 +2,8 @@
 /**
  * Applies the schema migrations, in order, without needing psql.
  *
- *   DATABASE_URL=… node scripts/apply-migrations.mjs           # all of them
- *   DATABASE_URL=… node scripts/apply-migrations.mjs uptime-monitors.sql
+ *   DATABASE_URL=postgres://… npm run db:apply                 # all of them
+ *   DATABASE_URL=postgres://… npm run db:apply uptime-monitors.sql
  *
  * Every migration is written to be safe to rerun, so applying them all to a
  * database that already has some is the normal case, not a repair.
@@ -23,6 +23,8 @@
  * harness hit exactly this and does the same thing.
  */
 import { readFileSync, existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { join } from 'node:path';
 import postgres from 'postgres';
 
 /** Dependency order: later files assume the tables earlier ones create. */
@@ -42,8 +44,8 @@ if (!connectionString) {
     [
       'DATABASE_URL is not set.',
       '',
-      'PowerShell:  $env:DATABASE_URL="postgres://…"; node scripts/apply-migrations.mjs',
-      'bash:        DATABASE_URL="postgres://…" node scripts/apply-migrations.mjs',
+      'PowerShell:  $env:DATABASE_URL="postgres://user:pass@host/db"; npm run db:apply',
+      'bash:        DATABASE_URL="postgres://user:pass@host/db" npm run db:apply',
       '',
       'Note the $env: prefix in PowerShell — a bare $DATABASE_URL expands to nothing.',
     ].join('\n')
@@ -62,11 +64,46 @@ for (const name of files) {
 // Say which database, out loud, before touching it. The connection string
 // carries a password, so only the parts that identify the target are printed.
 let target;
+let parsed;
 try {
-  const url = new URL(connectionString);
-  target = `${url.hostname}${url.pathname}`;
+  parsed = new URL(connectionString);
+  target = `${parsed.hostname}${parsed.pathname}`;
 } catch {
   console.error('DATABASE_URL is not a valid connection string.');
+  process.exit(1);
+}
+
+/**
+ * Catch a placeholder that was pasted rather than replaced.
+ *
+ * Documentation examples elide the interesting parts, and an elided example is
+ * still a syntactically valid URL, so the first thing to complain is DNS —
+ * `getaddrinfo ENOTFOUND %E2%80%A6-pooler%E2%80%A6`, which reads like a network
+ * problem rather than "you did not fill this in".
+ */
+const placeholder =
+  /[^\x20-\x7e]/.test(decodeURIComponent(parsed.hostname)) ||
+  /%E2%80%A6|\.\.\.|<|>|YOUR_|EXAMPLE|PASSWORD/i.test(connectionString);
+
+if (placeholder) {
+  console.error(
+    [
+      'DATABASE_URL still contains placeholder text.',
+      '',
+      `  host: ${decodeURIComponent(parsed.hostname)}`,
+      '',
+      'Copy the real connection string from the Neon console:',
+      '  Project → Branches → your branch → Connection string → Pooled connection',
+      '',
+      'It looks like:',
+      '  postgres://USER:PASS@ep-something-123456-pooler.REGION.aws.neon.tech/neondb?sslmode=require',
+    ].join('\n')
+  );
+  process.exit(1);
+}
+
+if (!/^postgres(ql)?:$/.test(parsed.protocol)) {
+  console.error(`DATABASE_URL must be a postgres:// URL, not ${parsed.protocol}//`);
   process.exit(1);
 }
 
@@ -81,10 +118,46 @@ const sql = postgres(connectionString, {
   onnotice: () => {},
 });
 
+/**
+ * Creates the tables the SQL files then alter.
+ *
+ * Sequenced here rather than with `&&` in the npm script so that the URL is
+ * validated before anything runs. drizzle-kit going first meant a placeholder
+ * connection string produced a DNS error from a tool that had not been told
+ * what was wrong with it.
+ */
+function push() {
+  console.log('Pushing the Drizzle schema…');
+  /**
+   * Run drizzle-kit's script with this Node, rather than through npx.
+   *
+   * The wrapper on Windows is `npx.cmd`, and Node refuses to spawn a `.cmd`
+   * without a shell; using one brings back unescaped argument concatenation and
+   * a deprecation warning. The path is built rather than `require.resolve`d
+   * because `bin.cjs` is not listed in the package's `exports`.
+   */
+  const bin = join(process.cwd(), 'node_modules', 'drizzle-kit', 'bin.cjs');
+  if (!existsSync(bin)) {
+    throw new Error('drizzle-kit is not installed. Run npm install first.');
+  }
+
+  const result = spawnSync(process.execPath, [bin, 'push', '--force'], {
+    stdio: ['ignore', 'inherit', 'inherit'],
+    env: process.env,
+  });
+  if (result.status !== 0) {
+    throw new Error('drizzle-kit push failed; the SQL migrations were not applied.');
+  }
+  console.log('');
+}
+
 async function main() {
   const [{ db, usr }] = await sql`select current_database() as db, current_user as usr`;
   console.log(`Target:   ${target}`);
-  console.log(`Database: ${db} as ${usr}`);
+  console.log(`Database: ${db} as ${usr}\n`);
+
+  if (process.argv.includes('--push')) push();
+
   console.log(`Applying: ${files.join(', ')}\n`);
 
   for (const name of files) {
