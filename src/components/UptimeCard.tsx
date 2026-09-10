@@ -262,6 +262,21 @@ export function UptimeCard({ project }: { project: Project }) {
         </p>
       )}
 
+      {/* 401 and 403 are the confusing ones: the server is plainly alive, it
+          just refused us. Almost always the monitored URL is behind auth
+          rather than the site being broken, so say so instead of leaving
+          "HTTP 401" to be interpreted. */}
+      {result && !result.ok && (result.statusCode === 401 || result.statusCode === 403) && (
+        <p className="rounded-lg border border-border bg-surface-elevated px-3 py-2 text-xs text-text-muted">
+          The server answered but refused the request, so it is running — this
+          URL just needs authentication. Checks are unauthenticated by design.
+          Point the monitor at a public URL, and note that Vercel&apos;s
+          Deployment Protection returns {result.statusCode} for{' '}
+          <em>every</em> path, including public ones, until it is turned off for
+          production.
+        </p>
+      )}
+
       {/* One column per half hour of the last day. */}
       <div className="flex h-7 items-stretch gap-[2px]" role="img" aria-label="Uptime over the last 24 hours">
         {buckets.map((bucket) => (
