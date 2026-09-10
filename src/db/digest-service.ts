@@ -177,7 +177,13 @@ export async function digestStorageReady(): Promise<boolean> {
   try {
     await requireDb().execute(sql`select 1 from email_preferences limit 1`);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    // 42P01, undefined_table: the migration genuinely has not run.
+    if ((error as { code?: unknown })?.code === '42P01') return false;
+
+    // Anything else is a real failure. Swallowing it would make the digest
+    // report "storage not ready" and mail nobody, week after week, while the
+    // actual problem was that the database could not be reached.
+    throw error;
   }
 }

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { getOptionalUserId } from '@/src/lib/auth';
+import { getOptionalUserId, isClerkConfigured } from '@/src/lib/auth';
 import { GitHubAuthButton } from '@/src/components/GitHubAuthButton';
 
 const tiles = [
@@ -12,6 +12,16 @@ const tiles = [
 export default async function HomePage() {
   const userId = await getOptionalUserId();
   if (userId) redirect('/dashboard');
+
+  /**
+   * The GitHub button uses Clerk hooks, and the root layout mounts
+   * <ClerkProvider> only when a publishable key exists. Rendering it without
+   * one throws and takes the whole landing page down with a 500 — the
+   * marketing page, replaced by the runtime's error boundary. Every other auth
+   * surface already guards on this helper; this one was missed when GitHub
+   * sign-in was added.
+   */
+  const authReady = isClerkConfigured();
 
   return (
     <div className="min-h-full flex flex-col">
@@ -52,7 +62,7 @@ export default async function HomePage() {
             The same focused tracker as Local — with accounts, workspaces, and Pro when five projects is no longer enough.
           </p>
           <div className="mt-8 mx-auto w-full max-w-xs space-y-3">
-            <GitHubAuthButton label="Continue with GitHub" />
+            {authReady && <GitHubAuthButton label="Continue with GitHub" />}
             <div className="flex items-center justify-center gap-3">
               <Link
                 href="/sign-up"

@@ -12,8 +12,28 @@ export function getStripe(): Stripe {
   _stripe = new Stripe(key, {
     apiVersion: '2025-08-27.basil',
     typescript: true,
+    /**
+     * The SDK defaults to Node's http module, which workerd does not provide.
+     * The fetch client works under both runtimes, so it is set unconditionally
+     * rather than branching on the environment.
+     */
+    httpClient: Stripe.createFetchHttpClient(),
   });
   return _stripe;
+}
+
+/**
+ * Verifies webhook signatures using Web Crypto.
+ *
+ * `constructEvent` is synchronous and needs Node's `crypto`; on Workers only
+ * the async path backed by SubtleCrypto exists. Cached because creating a
+ * provider per request is wasted work.
+ */
+let _cryptoProvider: ReturnType<typeof Stripe.createSubtleCryptoProvider> | null = null;
+
+export function getWebhookCryptoProvider() {
+  _cryptoProvider ??= Stripe.createSubtleCryptoProvider();
+  return _cryptoProvider;
 }
 
 export function getAppUrl(): string {

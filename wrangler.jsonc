@@ -3,11 +3,50 @@
   "name": "vibeops-cloud",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-09-04",
+
+  /**
+   * `nodejs_compat` is required, not optional. It provides the TCP sockets
+   * postgres.js needs, and it populates `process.env` from the vars and
+   * secrets below — which is where every server module reads configuration
+   * from. Verified locally: with DATABASE_URL set as a var, /api/health
+   * reports hasDatabase true.
+   */
   "compatibility_flags": ["nodejs_compat"],
+
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+
+  /**
+   * Configuration lives in secrets, not here, so nothing environment-specific
+   * is committed. Set each with `npx wrangler secret put <NAME>`:
+   *
+   *   DATABASE_URL                        Neon's POOLED endpoint (see below)
+   *   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY   also needed at build time
+   *   CLERK_SECRET_KEY
+   *   STRIPE_SECRET_KEY
+   *   STRIPE_WEBHOOK_SECRET
+   *   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY  also needed at build time
+   *   STRIPE_PRICE_PRO_MONTHLY
+   *   STRIPE_PRICE_PRO_YEARLY
+   *   NEXT_PUBLIC_APP_URL                 also needed at build time
+   *   RESEND_API_KEY
+   *   EMAIL_FROM
+   *   CRON_SECRET
+   *   ADMIN_USER_IDS / ADMIN_EMAILS
+   *
+   * NEXT_PUBLIC_* values are inlined by Next at build time, so they must be
+   * present in the build environment as well as set as secrets — a secret
+   * alone will not reach client bundles.
+   *
+   * DATABASE_URL must be Neon's pooled endpoint, the host containing
+   * `-pooler`. Each Workers isolate opens its own connection, and the direct
+   * endpoint's limit would be exhausted well before traffic justified it.
+   * `prepare: false` is already set in src/db/index.ts, which is what makes a
+   * transaction-mode pooler safe here.
+   */
+
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1

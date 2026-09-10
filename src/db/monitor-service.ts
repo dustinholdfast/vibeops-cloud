@@ -95,8 +95,18 @@ export async function monitorStorageReady(): Promise<boolean> {
   try {
     await requireDb().execute(sql`select 1 from project_monitors limit 1`);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    // 42P01, undefined_table: the migration genuinely has not run.
+    if ((error as { code?: unknown })?.code === '42P01') return false;
+
+    /**
+     * Anything else is not a missing migration and must not be reported as
+     * one. An unreachable database, a rejected password or an exhausted
+     * connection limit would otherwise surface as "monitoring is not set up",
+     * sending whoever is debugging to look at schema instead of the network.
+     * On Workers that is the more likely failure of the two.
+     */
+    throw error;
   }
 }
 

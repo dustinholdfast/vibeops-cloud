@@ -3,9 +3,8 @@ import { eq } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { requireDb } from '@/src/db';
 import { subscriptions } from '@/src/db/schema';
-import { getStripe } from '@/src/lib/stripe';
+import { getStripe, getWebhookCryptoProvider } from '@/src/lib/stripe';
 
-export const runtime = 'nodejs';
 
 function periodEndFromSub(sub: Stripe.Subscription): Date | null {
   // API basil+: period lives on subscription items, not the subscription root
@@ -109,7 +108,22 @@ export async function POST(req: Request) {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(body, sig, secret);
+    /**
+     * The async variant, not `constructEvent`.
+     *
+     * The synchronous one needs Node's `crypto`, which workerd does not have,
+     * so on Workers it throws and every webhook would be rejected as an
+     * invalid signature — subscriptions would silently stop syncing with
+     * nothing in the logs to suggest a crypto problem. This path uses
+     * SubtleCrypto and works under both runtimes.
+     */
+    event = await stripe.webhooks.constructEventAsync(
+      body,
+      sig,
+      secret,
+      undefined,
+      getWebhookCryptoProvider()
+    );
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Invalid signature';
     console.error('[stripe webhook] signature', message);

@@ -119,7 +119,23 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const send = url.searchParams.get('send') === '1';
 
-  if (!(await monitorStorageReady())) {
+  let storageReady: boolean;
+  try {
+    storageReady = await monitorStorageReady();
+  } catch (error) {
+    // A missing table and an unreachable database used to look identical here.
+    // Telling them apart is what saves an afternoon after a hosting change.
+    console.error('[uptime] database unreachable', error);
+    return NextResponse.json(
+      {
+        error: 'The database could not be reached. This is not a missing migration.',
+        code: 'DATABASE_UNAVAILABLE',
+      },
+      { status: 503 }
+    );
+  }
+
+  if (!storageReady) {
     return NextResponse.json(
       {
         error: 'project_monitors is missing. Apply scripts/uptime-monitors.sql.',

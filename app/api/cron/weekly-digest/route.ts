@@ -47,7 +47,23 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const send = url.searchParams.get('send') === '1';
 
-  if (!(await digestStorageReady())) {
+  let storageReady: boolean;
+  try {
+    storageReady = await digestStorageReady();
+  } catch (error) {
+    // Distinguished from a missing table on purpose: a digest that mails
+    // nobody every week because the database is unreachable should say so.
+    console.error('[digest] database unreachable', error);
+    return NextResponse.json(
+      {
+        error: 'The database could not be reached. This is not a missing migration.',
+        code: 'DATABASE_UNAVAILABLE',
+      },
+      { status: 503 }
+    );
+  }
+
+  if (!storageReady) {
     return NextResponse.json(
       {
         error: 'email_preferences is missing. Apply scripts/email-preferences.sql.',
