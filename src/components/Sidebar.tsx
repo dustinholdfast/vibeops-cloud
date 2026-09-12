@@ -67,18 +67,16 @@ export function Sidebar({
         <div className="px-3.5 py-4 flex items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/logo.svg"
-            alt="VibeOps"
+            src="/logo.png"
+            alt="Noxen"
             width={28}
             height={28}
             className="w-7 h-7 rounded-full flex-shrink-0"
           />
           <span className="font-semibold text-text tracking-tight text-[15px]">
-            Vibe <span className="text-text-muted font-normal">/ Ops</span>
+            Noxen
           </span>
-          <span className="text-[9px] font-medium uppercase tracking-wider text-purple-light bg-purple/15 px-1.5 py-0.5 rounded">
-            Cloud
-          </span>
+
         </div>
 
         <p className="px-4 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-dim">

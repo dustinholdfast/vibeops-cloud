@@ -15,7 +15,7 @@ export function GitHubPushButton({ projectId, repoUrl }: { projectId: string; re
   if (!repo) {
     return (
       <p className="text-xs text-text-dim">
-        Add a github.com repo URL to push a VibeOps snapshot from here.
+        Add a github.com repo URL to push a Noxen snapshot from here.
       </p>
     );
   }

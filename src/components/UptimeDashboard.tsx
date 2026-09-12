@@ -198,9 +198,9 @@ export function UptimeDashboard() {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4">
           <div className="flex min-w-0 items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.svg" alt="" width={28} height={28} className="h-7 w-7 rounded-full" />
+            <img src="/logo.png" alt="" width={28} height={28} className="h-7 w-7 rounded-full" />
             <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-wider text-text-dim">Vibe / Ops</p>
+              <p className="text-[11px] uppercase tracking-wider text-text-dim">Noxen</p>
               <h1 className="text-lg font-semibold tracking-tight">Uptime</h1>
             </div>
           </div>

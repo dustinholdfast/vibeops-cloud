@@ -66,7 +66,7 @@ export function Header({ account, onMenu }: { account?: ReactNode; onMenu?: () =
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `vibeops-export-${format(new Date(), 'yyyy-MM-dd')}.json`;
+    a.download = `noxen-export-${format(new Date(), 'yyyy-MM-dd')}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -83,7 +83,7 @@ export function Header({ account, onMenu }: { account?: ReactNode; onMenu?: () =
         if (Array.isArray(raw)) list = raw;
         else if (raw && Array.isArray(raw.projects)) list = raw.projects;
         else {
-          reportError('That file is not a VibeOps export: expected an array of projects or { projects: [...] }.');
+          reportError('That file is not a Noxen export: expected an array of projects or { projects: [...] }.');
           return;
         }
       } catch {

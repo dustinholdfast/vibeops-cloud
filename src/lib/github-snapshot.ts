@@ -29,6 +29,6 @@ export function renderProjectSnapshot(project: Project): string {
     }
     lines.push('');
   }
-  lines.push('_Written by Vibe / Ops Cloud._', '');
+  lines.push('_Written by Noxen Cloud._', '');
   return lines.join('\n');
 }

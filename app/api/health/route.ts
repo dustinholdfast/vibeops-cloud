@@ -25,7 +25,7 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     ok: true,
-    service: 'vibeops-cloud',
+    service: 'noxen',
     phase: 3,
     hasDatabase: Boolean(process.env.DATABASE_URL),
     hasClerk: Boolean(

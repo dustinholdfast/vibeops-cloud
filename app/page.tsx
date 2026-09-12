@@ -28,13 +28,11 @@ export default async function HomePage() {
       <header className="px-6 py-5 flex items-center justify-between max-w-5xl mx-auto w-full">
         <div className="flex items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="" width={28} height={28} className="w-7 h-7 rounded-full" />
+          <img src="/logo.png" alt="" width={28} height={28} className="w-7 h-7 rounded-full" />
           <span className="font-semibold tracking-tight">
-            Vibe <span className="text-text-muted font-normal">/ Ops</span>
+            Noxen
           </span>
-          <span className="text-[10px] font-medium uppercase tracking-wider text-purple-light bg-purple/15 px-1.5 py-0.5 rounded">
-            Cloud
-          </span>
+
         </div>
         <nav className="flex items-center gap-3 text-sm">
           <Link href="/pricing" className="text-text-muted hover:text-text">
@@ -97,7 +95,7 @@ export default async function HomePage() {
             target="_blank"
             rel="noreferrer"
           >
-            VibeOps Local
+            Noxen Local
           </a>
           .
         </p>

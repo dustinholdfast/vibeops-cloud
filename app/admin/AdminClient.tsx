@@ -197,9 +197,9 @@ export function AdminClient() {
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3 min-w-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.svg" alt="" width={28} height={28} className="w-7 h-7 rounded-full" />
+            <img src="/logo.png" alt="" width={28} height={28} className="w-7 h-7 rounded-full" />
             <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-wider text-text-dim">Vibe / Ops</p>
+              <p className="text-[11px] uppercase tracking-wider text-text-dim">Noxen</p>
               <h1 className="text-lg font-semibold tracking-tight">Admin</h1>
             </div>
           </div>

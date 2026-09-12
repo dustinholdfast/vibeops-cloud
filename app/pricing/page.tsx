@@ -12,9 +12,9 @@ export default async function PricingPage() {
         <header className="flex items-center justify-between gap-3 mb-10">
           <Link href="/" className="inline-flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.svg" alt="" width={28} height={28} className="w-7 h-7 rounded-full" />
+            <img src="/logo.png" alt="" width={28} height={28} className="w-7 h-7 rounded-full" />
             <span className="font-semibold text-text">
-              Vibe <span className="text-text-muted font-normal">/ Ops</span>
+              Noxen
             </span>
             <span className="text-[10px] uppercase tracking-wider text-purple-light bg-purple/15 px-1.5 py-0.5 rounded">
               Cloud

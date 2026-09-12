@@ -14,9 +14,9 @@ export function AuthFrame({
     <div className="min-h-full flex flex-col items-center justify-center px-4 py-10">
       <Link href="/" className="mb-6 inline-flex items-center gap-2">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.svg" alt="" width={28} height={28} className="w-7 h-7 rounded-full" />
+        <img src="/logo.png" alt="" width={28} height={28} className="w-7 h-7 rounded-full" />
         <span className="font-semibold tracking-tight text-text">
-          Vibe <span className="text-text-muted font-normal">/ Ops</span>
+          Noxen
         </span>
       </Link>
       <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6">

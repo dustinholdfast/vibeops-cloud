@@ -38,7 +38,7 @@ export function AcceptInvite({ token }: { token: string }) {
     <main className="flex min-h-screen items-center justify-center bg-background px-6 text-text">
       <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-8 text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.svg" alt="" width={40} height={40} className="mx-auto mb-4 w-10 h-10 rounded-full" />
+        <img src="/logo.png" alt="" width={40} height={40} className="mx-auto mb-4 w-10 h-10 rounded-full" />
         {status.state === 'working' && (
           <>
             <Loader2 size={20} className="mx-auto animate-spin text-purple-light" aria-hidden />

@@ -10,7 +10,7 @@ export const DEFAULT_TIMEOUT_MS = 10_000;
 const MAX_TIMEOUT_MS = 30_000;
 
 /** Identifies the checker so site owners can see who is hitting them. */
-const USER_AGENT = 'VibeOpsUptime/1.0 (+https://github.com/dustinholdfast/vibeops-cloud)';
+const USER_AGENT = 'NoxenUptime/1.0 (+https://github.com/dustinholdfast/vibeops-cloud)';
 
 export async function probe(
   url: string,

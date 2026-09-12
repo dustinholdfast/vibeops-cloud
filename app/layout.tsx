@@ -5,9 +5,9 @@ import './globals.css';
 import { DraftSession } from '@/src/components/DraftSession';
 
 export const metadata: Metadata = {
-  title: 'Vibe / Ops Cloud',
-  description: 'Hosted multi-tenant vibe coding project tracker',
-  icons: { icon: '/favicon.svg' },
+  title: 'Noxen',
+  description: 'Noxen — hosted multi-tenant project command center',
+  icons: { icon: '/favicon-32.png', apple: '/apple-touch.png' },
 };
 
 export const dynamic = 'force-dynamic';

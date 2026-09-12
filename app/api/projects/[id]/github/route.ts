@@ -24,7 +24,7 @@ export async function POST(req: Request, ctx: Ctx) {
       ref,
       path,
       content: renderProjectSnapshot(project),
-      message: `vibeops: snapshot ${project.name}`,
+      message: `noxen: snapshot ${project.name}`,
     });
     return NextResponse.json({
       ok: true,

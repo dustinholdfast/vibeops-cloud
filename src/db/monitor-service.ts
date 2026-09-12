@@ -391,7 +391,7 @@ export async function dueMonitors(now: Date = new Date(), limit = 100): Promise<
  * The shortest gap allowed between manual checks of one project.
  *
  * The button asks our server to fetch somebody else's URL on demand, so
- * without this it is a way to make VibeOps hammer a third party. Held in the
+ * without this it is a way to make Noxen hammer a third party. Held in the
  * database rather than in memory because there is no single process to hold it.
  */
 export const MANUAL_CHECK_COOLDOWN_MS = 15_000;

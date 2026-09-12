@@ -22,7 +22,7 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       'Up to 5 projects',
       'Now / Next / Later priorities',
       'Rotting & deadline signals',
-      'Import from VibeOps Local',
+      'Import from Noxen Local',
     ],
   },
   pro: {

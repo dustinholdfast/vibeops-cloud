@@ -178,7 +178,7 @@ function htmlFor(input: DigestInput): string {
             <tr>
               <td style="padding:28px 28px 8px;">
                 <p style="margin:0 0 18px;font-size:13px;color:#71717a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-                  <strong style="color:#18181b;">Vibe / Ops</strong> · week in review
+                  <strong style="color:#18181b;">Noxen</strong> · week in review
                 </p>
                 <p style="margin:0 0 20px;font-size:15px;color:#3f3f46;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${greeting}</p>
                 <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${blocks}</div>
