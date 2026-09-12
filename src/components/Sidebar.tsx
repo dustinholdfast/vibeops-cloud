@@ -64,19 +64,13 @@ export function Sidebar({
           mobileOpen ? 'max-lg:translate-x-0' : 'max-lg:-translate-x-full'
         )}
       >
-        <div className="px-3.5 py-4 flex items-center gap-2.5">
+        <div className="px-3.5 py-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo.png"
             alt="Noxen"
-            width={28}
-            height={28}
-            className="w-7 h-7 rounded-full flex-shrink-0"
+            className="w-full h-auto object-contain"
           />
-          <span className="font-semibold text-text tracking-tight text-[15px]">
-            Noxen
-          </span>
-
         </div>
 
         <p className="px-4 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-dim">
