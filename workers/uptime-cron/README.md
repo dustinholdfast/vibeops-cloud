@@ -32,18 +32,24 @@ or twice, is harmless.
 
 ## Configure
 
-Two values, neither committed:
+`CRON_SECRET` is required and must match the secret on `vibeops-cloud`:
 
 ```bash
-npx wrangler secret put APP_URL       # https://your-domain.com — no trailing path
-npx wrangler secret put CRON_SECRET   # must equal CRON_SECRET in the Vercel env
+npx wrangler secret put CRON_SECRET   # must equal CRON_SECRET on vibeops-cloud
 ```
 
-`APP_URL` is not really a secret; it is set this way only so the domain is not
-committed. Put it in `vars` in `wrangler.jsonc` instead if you prefer.
+`APP_URL` for the workers.dev staging origin is committed in `wrangler.jsonc`
+`vars`. More important on workers.dev: a **service binding** to `vibeops-cloud`
+(`VIBEOPS`). Same-zone Worker-to-Worker calls through global `fetch` return
+Cloudflare error **1042**; the binding is what makes the sweep actually run.
 
-Both must be present. If either is missing the Worker throws rather than
-quietly doing nothing, so the failure is visible in the Cloudflare dashboard.
+After deploy, prove the wiring without waiting for the schedule:
+
+```bash
+curl -s https://vibeops-uptime-cron.<account>.workers.dev/
+curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" \
+  https://vibeops-uptime-cron.<account>.workers.dev/run
+```
 
 ## Deploy
 

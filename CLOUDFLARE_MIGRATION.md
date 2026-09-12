@@ -120,7 +120,9 @@ with a hosting change.
    billing and 5xx rates.
 5. Delete the `vercel.json` cron once nothing is served from Vercel.
 
-**Keep `workers/uptime-cron` as a separate Worker.** Folding the schedule into
+**Keep `workers/uptime-cron` as a separate Worker.** On `workers.dev` it must
+use `global_fetch_strictly_public` (or a service binding); plain same-zone
+`fetch` returns Cloudflare error 1042 and the sweep never runs. Folding the schedule into
 the app's own `wrangler.jsonc` looks tidier and does not work: the OpenNext
 bundle exports only `fetch`, with no `scheduled` handler, so a cron trigger on
 it would fail on every invocation. Replacing the entry point to add one means

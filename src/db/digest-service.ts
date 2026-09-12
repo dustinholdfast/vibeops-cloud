@@ -1,5 +1,5 @@
 import { and, desc, eq, inArray, lt, or, isNull, sql } from 'drizzle-orm';
-import { requireDb } from './index';
+import { requireDb, resetDb } from './index';
 import { emailPreferences, projects, workspaceMembers, workspaces } from './schema';
 import { dbProjectToDomain } from './map';
 import { buildPortfolioReview, REVIEW_WINDOW_DAYS } from '../lib/review';

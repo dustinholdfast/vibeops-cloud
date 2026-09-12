@@ -11,6 +11,14 @@ touched.
 
 ## The scheduler: a Cloudflare Worker
 
+On `workers.dev`, the scheduler Worker cannot call the app through ordinary
+`fetch` — Cloudflare returns error **1042** for same-zone Worker-to-Worker
+requests. `workers/uptime-cron` sets the `global_fetch_strictly_public`
+compatibility flag so the public `APP_URL` fetch reaches the app. A `VIBEOPS`
+service binding is also declared as a fallback.
+
+
+
 `vercel.json` deliberately carries **no** uptime cron. Vercel Hobby accepts only
 once-daily cron expressions and rejects anything finer *at deploy time*, so a
 five-minute entry there would fail the deployment — and a daily check is not
@@ -20,8 +28,9 @@ The scheduler is [`workers/uptime-cron`](workers/uptime-cron/README.md), whose
 README covers configuring and deploying it. Two values, neither committed:
 
 ```bash
-npx wrangler secret put APP_URL       # https://your-domain.com
-npx wrangler secret put CRON_SECRET   # must equal CRON_SECRET in the Vercel env
+npx wrangler secret put CRON_SECRET   # must equal CRON_SECRET on vibeops-cloud
+# APP_URL is a wrangler var for workers.dev; a VIBEOPS service binding reaches the app
+# (global fetch to *.workers.dev from another Worker returns Cloudflare 1042)
 ```
 
 `CRON_SECRET` is shared by every `/api/cron/*` route and they refuse to run

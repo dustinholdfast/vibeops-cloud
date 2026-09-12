@@ -1,5 +1,5 @@
 import { and, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm';
-import { requireDb } from './index';
+import { requireDb, resetDb } from './index';
 import { projectChecks, projectMonitors, projects } from './schema';
 import { ProjectError } from '../lib/project-validation';
 import { can } from '../lib/workspace-roles';
@@ -106,6 +106,7 @@ export async function monitorStorageReady(): Promise<boolean> {
      * sending whoever is debugging to look at schema instead of the network.
      * On Workers that is the more likely failure of the two.
      */
+    resetDb();
     throw error;
   }
 }
@@ -420,28 +421,52 @@ export async function recordCheck(
   now: Date = new Date()
 ): Promise<void> {
   const db = requireDb();
+  /**
+   * Timestamps go in as ISO strings. Drizzle's Date mapping for inserts is
+   * supposed to serialise them, but on Workers the postgres.js path has
+   * already proven it will throw "string argument must be of type string /
+   * Received an instance of Date" for the same values in SQL fragments —
+   * and a hung/cancelled Worker after that leaves the isolate poisoned.
+   * Strings are unambiguous everywhere we have measured.
+   */
+  const at = now.toISOString();
 
-  await db.insert(projectChecks).values({
-    projectId,
-    checkedAt: now,
-    ok: outcome.ok ? 1 : 0,
-    statusCode: outcome.statusCode,
-    latencyMs: outcome.latencyMs,
-    error: outcome.error,
-  });
+  await db.execute(sql`
+    insert into project_checks (project_id, checked_at, ok, status_code, latency_ms, error)
+    values (
+      ${projectId},
+      ${at}::timestamptz,
+      ${outcome.ok ? 1 : 0},
+      ${outcome.statusCode},
+      ${outcome.latencyMs},
+      ${outcome.error}
+    )
+  `);
 
-  await db
-    .update(projectMonitors)
-    .set({
-      status: transition.status,
-      consecutiveFailures: transition.consecutiveFailures,
-      consecutiveSuccesses: transition.consecutiveSuccesses,
-      lastCheckedAt: now,
-      lastError: outcome.ok ? null : outcome.error,
-      ...(transition.alert ? { lastStatusChangeAt: now } : {}),
-      updatedAt: now,
-    })
-    .where(eq(projectMonitors.projectId, projectId));
+  if (transition.alert) {
+    await db.execute(sql`
+      update project_monitors
+         set status = ${transition.status},
+             consecutive_failures = ${transition.consecutiveFailures},
+             consecutive_successes = ${transition.consecutiveSuccesses},
+             last_checked_at = ${at}::timestamptz,
+             last_status_change_at = ${at}::timestamptz,
+             last_error = ${outcome.ok ? null : outcome.error},
+             updated_at = ${at}::timestamptz
+       where project_id = ${projectId}
+    `);
+  } else {
+    await db.execute(sql`
+      update project_monitors
+         set status = ${transition.status},
+             consecutive_failures = ${transition.consecutiveFailures},
+             consecutive_successes = ${transition.consecutiveSuccesses},
+             last_checked_at = ${at}::timestamptz,
+             last_error = ${outcome.ok ? null : outcome.error},
+             updated_at = ${at}::timestamptz
+       where project_id = ${projectId}
+    `);
+  }
 }
 
 /**
@@ -504,11 +529,17 @@ export async function getUptimeAlerts(userId: string): Promise<boolean> {
 /** Drops check rows past the retention window. Returns how many went. */
 export async function pruneChecks(now: Date = new Date()): Promise<number> {
   const cutoff = new Date(now.getTime() - RETENTION_DAYS * DAY_MS);
-  const removed = await requireDb()
-    .delete(projectChecks)
-    .where(lt(projectChecks.checkedAt, cutoff))
-    .returning({ id: projectChecks.id });
-  return removed.length;
+  /**
+   * ISO string, not a Date: same Workers/postgres.js binding trap as
+   * dueMonitors. And prefer `rowCount` over `.returning()` — returning every
+   * deleted id can materialise a huge array when retention finally bites.
+   */
+  const result = await requireDb().execute(sql`
+    delete from project_checks
+     where checked_at < ${cutoff.toISOString()}::timestamptz
+  `);
+  const count = Number((result as { count?: number }).count ?? 0);
+  return count;
 }
 
 /** Turns uptime alerts on or off for one user. */

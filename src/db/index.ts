@@ -109,7 +109,14 @@ export function requireDb(): Database {
           max: 1,
           /** Skips the pg_catalog round trip on connect. */
           fetch_types: false,
-          idle_timeout: 20,
+          idle_timeout: 5,
+          max_lifetime: 30,
+          /**
+           * Without this, a suspended Neon branch (or a wedged TCP path) leaves
+           * the request hanging until workerd cancels it with a opaque 1101.
+           * Prefer a fast, named failure the cron can surface.
+           */
+          connect_timeout: 5,
         }
       : {}),
   });
@@ -130,3 +137,17 @@ export async function closeDb() {
   client = null;
   database = null;
 }
+
+/**
+ * Drop a cached handle after a connection failure.
+ *
+ * Isolates reuse the client across requests. If Neon suspends mid-flight or a
+ * TCP path dies, the next query can hang until workerd cancels the request —
+ * and the dead handle stays cached. Clearing it lets the following request
+ * open a fresh connection instead of reusing a corpse.
+ */
+export function resetDb() {
+  client = null;
+  database = null;
+}
+

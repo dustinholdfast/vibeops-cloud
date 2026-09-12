@@ -29,3 +29,6 @@ next-env.d.ts
 
 # drizzle
 drizzle/meta
+
+# local cron secret used by agents / ops
+.cron_secret

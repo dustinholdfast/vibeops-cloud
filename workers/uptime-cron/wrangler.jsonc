@@ -3,16 +3,28 @@
   "name": "vibeops-uptime-cron",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-04",
+  "compatibility_flags": ["global_fetch_strictly_public"],
 
   // Cloudflare honours this. GitHub Actions does not — see the README.
   "triggers": {
     "crons": ["*/5 * * * *"]
   },
 
-  // APP_URL is not sensitive, but it differs per deployment, so it is set with
-  // `wrangler secret put APP_URL` rather than committed here. Uncomment and
-  // fill this in instead if you would rather keep it in the repo.
-  // "vars": { "APP_URL": "https://your-domain.com" },
+  // Staging origin is not sensitive; keeping it in vars means a fresh deploy
+  // cannot "forget" APP_URL the way a missing secret did. Used when there is
+  // no service binding (e.g. pointing at Vercel during a cutover). On
+  // workers.dev, same-zone fetches via global fetch return Cloudflare 1042 —
+  // the VIBEOPS binding below is what makes the sweep actually reach the app.
+  "vars": {
+    "APP_URL": "https://vibeops-cloud.dustin-eef.workers.dev"
+  },
+
+  "services": [
+    {
+      "binding": "VIBEOPS",
+      "service": "vibeops-cloud"
+    }
+  ],
 
   "observability": {
     "enabled": true,
