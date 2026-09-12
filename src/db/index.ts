@@ -1,6 +1,5 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { AsyncLocalStorage } from 'node:async_hooks';
 import { after } from 'next/server';
 import * as schema from './schema';
 
@@ -14,10 +13,11 @@ import * as schema from './schema';
  * unconfigured. Reading it on first call moves the lookup inside a request,
  * where the value exists.
  *
- * On Node the handle is cached for the process. On Workers each request gets
- * its own postgres.js client (AsyncLocalStorage): sharing one socket across
- * concurrent dashboard fetches hung into opaque 1101s, and reusing a socket
- * across sequential requests went half-dead on Neon after the first query.
+ * On Node the handle is cached for the process. On Workers it is cached for
+ * the isolate but released after in-flight requests finish (refcount + after()).
+ * Do not call `client.end()` from a request — that races siblings and cancels
+ * them with Workers 1101. Do not use AsyncLocalStorage.enterWith — workerd
+ * does not implement it.
  */
 
 /** True inside workerd. Node and the build have no `navigator`. */
@@ -27,12 +27,6 @@ const onWorkers =
 type Client = ReturnType<typeof postgres>;
 type Database = ReturnType<typeof drizzle>;
 
-type RequestDb = { client: Client; database: Database };
-
-/** Per-request handle on Workers. */
-const requestDb = new AsyncLocalStorage<RequestDb>();
-
-/** Process-wide handle on Node (tests, scripts, `next start`). */
 let client: Client | null = null;
 let database: Database | null = null;
 
@@ -86,14 +80,42 @@ export function normaliseConnectionString(raw: string, workers = onWorkers): str
   return changed ? url.toString() : raw;
 }
 
-function openClient(): Client {
+/**
+ * In-flight Worker requests that borrowed the cached handle.
+ *
+ * The dashboard fans out projects + monitor + workspace calls on one isolate.
+ * Refcount so the first request's `after()` cannot drop the handle under its
+ * siblings. Never `end()` here — ending races holders and produces 1101s.
+ */
+let borrowCount = 0;
+
+function scheduleRequestRelease() {
+  if (!onWorkers) return;
+  borrowCount += 1;
+  try {
+    after(() => {
+      borrowCount = Math.max(0, borrowCount - 1);
+      if (borrowCount === 0) resetDb();
+    });
+  } catch {
+    // `after()` only works inside a request/lifecycle context (not tests).
+    borrowCount = Math.max(0, borrowCount - 1);
+  }
+}
+
+export function requireDb(): Database {
+  if (database) {
+    scheduleRequestRelease();
+    return database;
+  }
+
   const raw = process.env.DATABASE_URL;
   if (!raw) {
     throw new Error('DATABASE_URL is not configured');
   }
   const connectionString = normaliseConnectionString(raw);
 
-  return postgres(connectionString, {
+  client = postgres(connectionString, {
     /**
      * Required by every transaction-mode pooler — Neon's pooled endpoint,
      * PgBouncer, Hyperdrive. Prepared statements belong to a session, and a
@@ -108,11 +130,14 @@ function openClient(): Client {
 
     ...(onWorkers
       ? {
-          /** One socket for this request only — see module doc. */
-          max: 1,
+          /**
+           * Small pool per isolate. Dashboard fan-out needs more than one
+           * concurrent query; Neon’s pooler still does the real pooling.
+           */
+          max: 5,
           /** Skips the pg_catalog round trip on connect. */
           fetch_types: false,
-          idle_timeout: 5,
+          idle_timeout: 20,
           /**
            * Without this, a suspended Neon branch (or a wedged TCP path) leaves
            * the request hanging until workerd cancels it with a opaque 1101.
@@ -122,39 +147,9 @@ function openClient(): Client {
         }
       : {}),
   });
-}
 
-export function requireDb(): Database {
-  if (onWorkers) {
-    const existing = requestDb.getStore();
-    if (existing) return existing.database;
-
-    const reqClient = openClient();
-    const reqDatabase = drizzle(reqClient, { schema });
-    const store: RequestDb = { client: reqClient, database: reqDatabase };
-    // Persist for the rest of this request's async chain (multiple service calls).
-    requestDb.enterWith(store);
-
-    try {
-      after(() => {
-        // Drop locals; best-effort end so Neon slots are not held for idle_timeout.
-        try {
-          void Promise.resolve(reqClient.end({ timeout: 1 })).catch(() => {});
-        } catch {
-          /* already dead */
-        }
-      });
-    } catch {
-      // `after()` only works inside a request/lifecycle context (not every test).
-    }
-
-    return reqDatabase;
-  }
-
-  if (database) return database;
-
-  client = openClient();
   database = drizzle(client, { schema });
+  scheduleRequestRelease();
   return database;
 }
 
@@ -178,9 +173,10 @@ export async function closeDb() {
 /**
  * Drop the cached handle without closing the socket.
  *
- * On Workers the live handle lives in AsyncLocalStorage, so this mainly
- * clears any leftover Node-style cache. Kept for monitor/digest failure paths
- * and the uptime cron finally block.
+ * Isolates reuse the client across requests. If Neon suspends or a TCP path
+ * dies, clearing the cache lets the following request open a fresh connection.
+ * Do not `end()` here: that races in-flight holders and caused Workers 1101s
+ * when the uptime cron awaited closeDb().
  */
 export function resetDb() {
   client = null;
