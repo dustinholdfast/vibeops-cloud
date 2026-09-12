@@ -10,11 +10,16 @@ export async function GET(req: Request) {
   const deep = new URL(req.url).searchParams.get('deep') === '1';
 
   let monitorsReady: boolean | 'unreachable' | 'skipped' = 'skipped';
+  let monitorsError: string | undefined;
   if (deep && process.env.DATABASE_URL) {
     try {
       monitorsReady = await monitorStorageReady();
-    } catch {
+    } catch (error) {
       monitorsReady = 'unreachable';
+      const message = error instanceof Error ? error.message : String(error);
+      const name = error instanceof Error ? error.name : 'Error';
+      monitorsError = `${name}: ${message}`.slice(0, 300);
+      console.error('[health] deep monitor probe failed', monitorsError);
     }
   }
 
@@ -27,6 +32,6 @@ export async function GET(req: Request) {
       process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY
     ),
     hasCronSecret: Boolean(process.env.CRON_SECRET),
-    ...(deep ? { monitorsReady } : {}),
+    ...(deep ? { monitorsReady, ...(monitorsError ? { monitorsError } : {}) } : {}),
   });
 }
