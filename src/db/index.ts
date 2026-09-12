@@ -109,12 +109,15 @@ export function requireDb(): Database {
           max: 1,
           /** Skips the pg_catalog round trip on connect. */
           fetch_types: false,
-          idle_timeout: 5,
-          max_lifetime: 30,
+          idle_timeout: 20,
           /**
            * Without this, a suspended Neon branch (or a wedged TCP path) leaves
            * the request hanging until workerd cancels it with a opaque 1101.
            * Prefer a fast, named failure the cron can surface.
+           *
+           * Do not set max_lifetime here: forcing reconnects every few dozen
+           * seconds on a max:1 Workers isolate races with in-flight requests
+           * and recreates the same poisoned-handle failure mode as closeDb().
            */
           connect_timeout: 5,
         }
@@ -129,24 +132,36 @@ export function requireDb(): Database {
  * Closes the connection pool.
  *
  * For short-lived processes — scripts, the test harness — so they can exit.
- * Never call it from a request handler: the handle is shared by every request
- * in the isolate, and closing it would break the ones still in flight.
+ * Never await this from a Worker request handler: the handle is shared by
+ * every request in the isolate. Prefer {@link resetDb} there.
+ *
+ * Always clears the cache *before* ending so a wedged `end()` cannot leave
+ * callers holding a corpse for the rest of the isolate's life.
  */
 export async function closeDb() {
-  if (client) await client.end({ timeout: 5 });
+  const old = client;
   client = null;
   database = null;
+  if (old) await old.end({ timeout: 5 });
 }
 
 /**
- * Drop a cached handle after a connection failure.
+ * Drop the cached handle without closing the socket.
  *
- * Isolates reuse the client across requests. If Neon suspends mid-flight or a
- * TCP path dies, the next query can hang until workerd cancels the request —
- * and the dead handle stays cached. Clearing it lets the following request
- * open a fresh connection instead of reusing a corpse.
+ * Isolates reuse the client across requests. If Neon suspends, a TCP path
+ * dies, or a prior `end()` left the driver wedged, the next query can hang
+ * until workerd cancels the request with an opaque 1101 — and the dead
+ * handle stays cached. Clearing the cache lets the following request open a
+ * fresh connection. Do not `end()` here: that races in-flight holders.
  */
 export function resetDb() {
+  /**
+   * Null only — do not call `end()` here. Ending races with any in-flight
+   * request that already holds the old client and is exactly how awaiting
+   * closeDb() from the uptime cron produced Workers 1101 cancellations on
+   * /api/projects and deep health. Idle sockets are reclaimed by idle_timeout;
+   * the next requireDb() opens a fresh connection.
+   */
   client = null;
   database = null;
 }

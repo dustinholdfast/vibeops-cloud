@@ -11,7 +11,7 @@ import { applyProbe, type Transition } from '@/src/lib/uptime/status';
 import { probe } from '@/src/lib/uptime/probe';
 import { sendAlerts } from '@/src/lib/uptime/alerting';
 import { isEmailConfigured } from '@/src/lib/email/send';
-import { closeDb } from '@/src/db';
+import { resetDb } from '@/src/db';
 
 /**
  * Runs every monitor that is due.
@@ -240,7 +240,9 @@ export async function GET(req: Request) {
     }
   } finally {
     // Drop the cached handle so a cancelled/hung TCP socket cannot poison the
-    // next request on this isolate (a recurring Workers + Neon failure mode).
-    await closeDb().catch(() => {});
+    // next request on this isolate. Must NOT await client.end() — that closes
+    // the shared socket under concurrent dashboard requests and workerd then
+    // cancels them with an opaque 1101 ("code had hung").
+    resetDb();
   }
 }

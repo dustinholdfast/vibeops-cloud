@@ -184,6 +184,8 @@ export async function digestStorageReady(): Promise<boolean> {
     // Anything else is a real failure. Swallowing it would make the digest
     // report "storage not ready" and mail nobody, week after week, while the
     // actual problem was that the database could not be reached.
+    // Drop a possibly-wedged cached handle so the next request can reconnect.
+    resetDb();
     throw error;
   }
 }
