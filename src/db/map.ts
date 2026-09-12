@@ -25,7 +25,8 @@ export function domainToDbInsert(
   userId: string,
   p: Project
 ): NewDbProject {
-  const now = new Date();
+  // ISO strings, not Date — Workers/postgres.js rejects Date bindings.
+  const now = new Date().toISOString();
   return {
     id: p.id,
     workspaceId,
@@ -36,12 +37,12 @@ export function domainToDbInsert(
     priority: p.priority,
     health: p.health,
     targetDate: p.targetDate,
-    lastTouched: new Date(p.lastTouched),
-    createdAt: new Date(p.createdAt),
+    lastTouched: p.lastTouched as unknown as Date,
+    createdAt: p.createdAt as unknown as Date,
     liveUrl: p.liveUrl ?? null,
     repoUrl: p.repoUrl ?? null,
     progress: p.progress,
     activity: p.activity,
-    updatedAt: now,
+    updatedAt: now as unknown as Date,
   };
 }

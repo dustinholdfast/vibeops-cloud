@@ -1,5 +1,6 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
+import { after } from 'next/server';
 import * as schema from './schema';
 
 /**
@@ -12,8 +13,11 @@ import * as schema from './schema';
  * unconfigured. Reading it on first call moves the lookup inside a request,
  * where the value exists.
  *
- * The handle is still cached per isolate, so connections are reused across
- * requests rather than reopened per query.
+ * On Node the handle is cached for the process. On Workers it is cached only
+ * for the current request: a Neon TCP socket often goes half-dead after the
+ * first query, and reusing it across requests cancels the next one with an
+ * opaque 1101. `after()` schedules {@link resetDb} so the next request opens
+ * a fresh connection.
  */
 
 /** True inside workerd. Node and the build have no `navigator`. */
@@ -76,8 +80,28 @@ export function normaliseConnectionString(raw: string, workers = onWorkers): str
   return changed ? url.toString() : raw;
 }
 
+/** True once we have asked Next to drop the handle after this request. */
+let releaseScheduled = false;
+
+function scheduleRequestRelease() {
+  if (!onWorkers || releaseScheduled) return;
+  releaseScheduled = true;
+  try {
+    after(() => {
+      releaseScheduled = false;
+      resetDb();
+    });
+  } catch {
+    // `after()` only works inside a request/lifecycle context (not tests).
+    releaseScheduled = false;
+  }
+}
+
 export function requireDb(): Database {
-  if (database) return database;
+  if (database) {
+    scheduleRequestRelease();
+    return database;
+  }
 
   const raw = process.env.DATABASE_URL;
   if (!raw) {
@@ -109,7 +133,7 @@ export function requireDb(): Database {
           max: 1,
           /** Skips the pg_catalog round trip on connect. */
           fetch_types: false,
-          idle_timeout: 20,
+          idle_timeout: 5,
           /**
            * Without this, a suspended Neon branch (or a wedged TCP path) leaves
            * the request hanging until workerd cancels it with a opaque 1101.
@@ -125,6 +149,7 @@ export function requireDb(): Database {
   });
 
   database = drizzle(client, { schema });
+  scheduleRequestRelease();
   return database;
 }
 

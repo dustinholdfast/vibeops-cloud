@@ -297,13 +297,14 @@ export async function updateProject(scope: Scope, projectId: string, input: unkn
       );
     }
 
-    const now = new Date();
+    // ISO strings — Date objects have poisoned Workers/postgres.js isolates.
+    const now = new Date().toISOString();
     const [row] = await tx
       .update(projects)
       .set({
         ...fields,
-        updatedAt: now,
-        lastTouched: now,
+        updatedAt: now as unknown as Date,
+        lastTouched: now as unknown as Date,
         version: existing.version + 1,
         lastMutationId: mutationId,
       })

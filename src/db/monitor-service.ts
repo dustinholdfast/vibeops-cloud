@@ -169,6 +169,8 @@ export async function getMonitorSnapshot(
     .where(eq(projectMonitors.projectId, projectId));
 
   const monthAgo = new Date(now.getTime() - 30 * DAY_MS);
+  // ISO bound, not Date — same Workers/postgres.js trap as dueMonitors.
+  const monthStart = sql`${monthAgo.toISOString()}::timestamptz`;
   const rows = await db
     .select({
       checkedAt: projectChecks.checkedAt,
@@ -178,7 +180,7 @@ export async function getMonitorSnapshot(
       error: projectChecks.error,
     })
     .from(projectChecks)
-    .where(and(eq(projectChecks.projectId, projectId), gte(projectChecks.checkedAt, monthAgo)))
+    .where(and(eq(projectChecks.projectId, projectId), sql`${projectChecks.checkedAt} >= ${monthStart}`))
     .orderBy(desc(projectChecks.checkedAt))
     .limit(5000);
 
@@ -245,39 +247,73 @@ export async function saveMonitor(
     10
   );
 
-  const now = new Date();
+  const at = new Date().toISOString();
   // Pointing a monitor somewhere else makes its history meaningless, so the
   // state resets rather than carrying "down" across to a different target.
   const retargeted = Boolean(existing) && existing.url !== target.url;
 
-  const values = {
-    projectId,
-    workspaceId: scope.workspace.workspaceId,
-    url: target.url,
-    enabled: enabled ? 1 : 0,
-    intervalSeconds,
-    failureThreshold,
-    timeoutMs: existing?.timeoutMs ?? 10_000,
-    status: retargeted ? 'unknown' : (existing?.status ?? 'unknown'),
-    consecutiveFailures: retargeted ? 0 : (existing?.consecutiveFailures ?? 0),
-    consecutiveSuccesses: retargeted ? 0 : (existing?.consecutiveSuccesses ?? 0),
-    lastCheckedAt: retargeted ? null : (existing?.lastCheckedAt ?? null),
-    lastStatusChangeAt: retargeted ? null : (existing?.lastStatusChangeAt ?? null),
-    lastError: retargeted ? null : (existing?.lastError ?? null),
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-  };
+  const status = retargeted ? 'unknown' : (existing?.status ?? 'unknown');
+  const consecutiveFailures = retargeted ? 0 : (existing?.consecutiveFailures ?? 0);
+  const consecutiveSuccesses = retargeted ? 0 : (existing?.consecutiveSuccesses ?? 0);
+  const lastCheckedAt = retargeted ? null : (existing?.lastCheckedAt?.toISOString() ?? null);
+  const lastStatusChangeAt = retargeted
+    ? null
+    : (existing?.lastStatusChangeAt?.toISOString() ?? null);
+  const lastError = retargeted ? null : (existing?.lastError ?? null);
+  const createdAt = existing?.createdAt?.toISOString() ?? at;
+  const timeoutMs = existing?.timeoutMs ?? 10_000;
+  const workspaceId = scope.workspace.workspaceId;
 
-  const [saved] = await db
-    .insert(projectMonitors)
-    .values(values)
-    .onConflictDoUpdate({ target: projectMonitors.projectId, set: values })
-    .returning();
+  /**
+   * Upsert with ISO timestamps via sql. Drizzle Date bindings on Workers have
+   * already poisoned isolates (same class of bug as recordCheck / dueMonitors).
+   */
+  await db.execute(sql`
+    insert into project_monitors (
+      project_id, workspace_id, url, enabled, interval_seconds, failure_threshold,
+      timeout_ms, status, consecutive_failures, consecutive_successes,
+      last_checked_at, last_status_change_at, last_error, created_at, updated_at
+    ) values (
+      ${projectId},
+      ${workspaceId},
+      ${target.url},
+      ${enabled ? 1 : 0},
+      ${intervalSeconds},
+      ${failureThreshold},
+      ${timeoutMs},
+      ${status},
+      ${consecutiveFailures},
+      ${consecutiveSuccesses},
+      ${lastCheckedAt}::timestamptz,
+      ${lastStatusChangeAt}::timestamptz,
+      ${lastError},
+      ${createdAt}::timestamptz,
+      ${at}::timestamptz
+    )
+    on conflict (project_id) do update set
+      workspace_id = excluded.workspace_id,
+      url = excluded.url,
+      enabled = excluded.enabled,
+      interval_seconds = excluded.interval_seconds,
+      failure_threshold = excluded.failure_threshold,
+      timeout_ms = excluded.timeout_ms,
+      status = excluded.status,
+      consecutive_failures = excluded.consecutive_failures,
+      consecutive_successes = excluded.consecutive_successes,
+      last_checked_at = excluded.last_checked_at,
+      last_status_change_at = excluded.last_status_change_at,
+      last_error = excluded.last_error,
+      updated_at = excluded.updated_at
+  `);
 
   if (retargeted) {
     await db.delete(projectChecks).where(eq(projectChecks.projectId, projectId));
   }
 
+  const [saved] = await db
+    .select()
+    .from(projectMonitors)
+    .where(eq(projectMonitors.projectId, projectId));
   return toView(saved);
 }
 
@@ -636,16 +672,17 @@ export async function listWorkspaceUptime(
   const monthAgo = new Date(now.getTime() - 30 * DAY_MS);
   const dayAgo = new Date(now.getTime() - DAY_MS);
   const weekAgo = new Date(now.getTime() - 7 * DAY_MS);
-  const inScope = and(
-    inArray(projectChecks.projectId, monitoredIds),
-    gte(projectChecks.checkedAt, monthAgo)
-  );
 
   // Boundaries are passed as cast strings, not Date objects. A bare parameter
   // inside a raw fragment gets none of the column's type mapping, so Postgres
   // is left to infer it — the explicit cast removes the guesswork.
+  const monthStart = sql`${monthAgo.toISOString()}::timestamptz`;
   const dayStart = sql`${dayAgo.toISOString()}::timestamptz`;
   const weekStart = sql`${weekAgo.toISOString()}::timestamptz`;
+  const inScope = and(
+    inArray(projectChecks.projectId, monitoredIds),
+    sql`${projectChecks.checkedAt} >= ${monthStart}`
+  );
 
   // The other casts are load-bearing too: count() is bigint and avg() numeric,
   // both of which the driver hands back as strings.
@@ -683,7 +720,7 @@ export async function listWorkspaceUptime(
     })
     .from(projectChecks)
     .where(
-      and(inArray(projectChecks.projectId, monitoredIds), gte(projectChecks.checkedAt, dayAgo))
+      and(inArray(projectChecks.projectId, monitoredIds), sql`${projectChecks.checkedAt} >= ${dayStart}`)
     );
 
   const totalsBy = new Map(totals.map((row) => [row.projectId, row]));
