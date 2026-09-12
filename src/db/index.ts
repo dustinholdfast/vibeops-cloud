@@ -80,20 +80,27 @@ export function normaliseConnectionString(raw: string, workers = onWorkers): str
   return changed ? url.toString() : raw;
 }
 
-/** True once we have asked Next to drop the handle after this request. */
-let releaseScheduled = false;
+/**
+ * In-flight Worker requests that borrowed the cached handle.
+ *
+ * A single boolean "release scheduled" flag is not enough: the dashboard fires
+ * projects + monitor + workspaces in parallel on one isolate, and the first
+ * request's `after()` would null the cache under the siblings. Refcount so we
+ * only drop the handle when the last concurrent borrower finishes.
+ */
+let borrowCount = 0;
 
 function scheduleRequestRelease() {
-  if (!onWorkers || releaseScheduled) return;
-  releaseScheduled = true;
+  if (!onWorkers) return;
+  borrowCount += 1;
   try {
     after(() => {
-      releaseScheduled = false;
-      resetDb();
+      borrowCount = Math.max(0, borrowCount - 1);
+      if (borrowCount === 0) resetDb();
     });
   } catch {
     // `after()` only works inside a request/lifecycle context (not tests).
-    releaseScheduled = false;
+    borrowCount = Math.max(0, borrowCount - 1);
   }
 }
 
@@ -125,12 +132,12 @@ export function requireDb(): Database {
     ...(onWorkers
       ? {
           /**
-           * One connection per isolate. Workers runs many short-lived
-           * isolates, and a ten-connection pool in each would exhaust Neon's
-           * limit long before the traffic justified it. The pooled endpoint
-           * does the real pooling.
+           * Small pool per isolate. The dashboard fans out projects + monitor
+           * + workspace calls in parallel; max:1 made those siblings queue on
+           * one socket and regularly hung into Workers 1101 under concurrency.
+           * Keep this tiny — Neon’s pooler still does the real pooling.
            */
-          max: 1,
+          max: 5,
           /** Skips the pg_catalog round trip on connect. */
           fetch_types: false,
           idle_timeout: 5,
