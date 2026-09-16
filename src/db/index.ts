@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { after } from 'next/server';
 import * as schema from './schema';
+import { env } from '../lib/env';
 
 /**
  * The database handle, created on first use.
@@ -109,7 +110,7 @@ export function requireDb(): Database {
     return database;
   }
 
-  const raw = process.env.DATABASE_URL;
+  const raw = env('DATABASE_URL');
   if (!raw) {
     throw new Error('DATABASE_URL is not configured');
   }

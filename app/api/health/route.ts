@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { monitorStorageReady } from '@/src/db/monitor-service';
+import { env } from '@/src/lib/env';
 
 /**
  * Cheap liveness by default. `?deep=1` also probes monitor storage — useful
@@ -11,7 +12,7 @@ export async function GET(req: Request) {
 
   let monitorsReady: boolean | 'unreachable' | 'skipped' = 'skipped';
   let monitorsError: string | undefined;
-  if (deep && process.env.DATABASE_URL) {
+  if (deep && env('DATABASE_URL')) {
     try {
       monitorsReady = await monitorStorageReady();
     } catch (error) {
@@ -27,11 +28,9 @@ export async function GET(req: Request) {
     ok: true,
     service: 'noxen',
     phase: 3,
-    hasDatabase: Boolean(process.env.DATABASE_URL),
-    hasClerk: Boolean(
-      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY
-    ),
-    hasCronSecret: Boolean(process.env.CRON_SECRET),
+    hasDatabase: Boolean(env('DATABASE_URL')),
+    hasClerk: Boolean(env('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY') && env('CLERK_SECRET_KEY')),
+    hasCronSecret: Boolean(env('CRON_SECRET')),
     ...(deep ? { monitorsReady, ...(monitorsError ? { monitorsError } : {}) } : {}),
   });
 }

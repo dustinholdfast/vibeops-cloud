@@ -25,8 +25,19 @@ export function domainToDbInsert(
   userId: string,
   p: Project
 ): NewDbProject {
-  // ISO strings, not Date — Workers/postgres.js rejects Date bindings.
-  const now = new Date().toISOString();
+  /**
+   * Drizzle timestamp columns, not raw SQL.
+   *
+   * PgTimestamp.mapToDriverValue calls `value.toISOString()`. Real Date
+   * objects survive that and become ISO strings *before* postgres.js sees
+   * them, which is what avoids the Workers "Received an instance of Date"
+   * poison. Passing an ISO string here throws `toISOString is not a function`
+   * and /api/projects reports it as a generic 503.
+   *
+   * Raw `sql` fragments are the opposite: interpolate ISO strings and cast
+   * `::timestamptz`. See `src/db/monitor-service.ts`.
+   */
+  const now = new Date();
   return {
     id: p.id,
     workspaceId,
@@ -37,12 +48,12 @@ export function domainToDbInsert(
     priority: p.priority,
     health: p.health,
     targetDate: p.targetDate,
-    lastTouched: p.lastTouched as unknown as Date,
-    createdAt: p.createdAt as unknown as Date,
+    lastTouched: new Date(p.lastTouched),
+    createdAt: new Date(p.createdAt),
     liveUrl: p.liveUrl ?? null,
     repoUrl: p.repoUrl ?? null,
     progress: p.progress,
     activity: p.activity,
-    updatedAt: now as unknown as Date,
+    updatedAt: now,
   };
 }

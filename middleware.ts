@@ -1,5 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server';
+import { env } from '@/src/lib/env';
 
 const isPublicRoute = createRouteMatcher([
   '/',
@@ -14,10 +15,26 @@ const isPublicRoute = createRouteMatcher([
   '/api/email/unsubscribe',
 ]);
 
+const isApiRoute = createRouteMatcher(['/api(.*)']);
+
 const withClerk = clerkMiddleware(async (auth, req) => {
-  if (!isPublicRoute(req)) {
-    await auth.protect();
+  if (isPublicRoute(req)) return;
+
+  // protect() rewrites missing sessions to the Next 404 HTML page. The dashboard
+  // fetch()es /api/projects as JSON, so a missed cookie would otherwise surface
+  // as a missing route rather than an expired session.
+  if (isApiRoute(req)) {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Please sign in again.', code: 'UNAUTHORIZED' },
+        { status: 401 }
+      );
+    }
+    return;
   }
+
+  await auth.protect();
 });
 
 /**
@@ -34,9 +51,7 @@ const withClerk = clerkMiddleware(async (auth, req) => {
  * A boolean per request is not worth optimising away for that.
  */
 function clerkConfigured(): boolean {
-  return Boolean(
-    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY
-  );
+  return Boolean(env('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY') && env('CLERK_SECRET_KEY'));
 }
 
 export default function middleware(req: NextRequest, event: NextFetchEvent) {

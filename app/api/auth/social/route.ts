@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { clerkFrontendApi, clerkKeyKind } from '@/src/lib/clerk-frontend';
 import { socialStrategiesFromEnvironment } from '@/src/lib/clerk-social';
+import { env } from '@/src/lib/env';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const publishableKey = env('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY');
   if (!publishableKey) {
     return NextResponse.json(
       { error: 'Clerk publishable key is not configured on this deployment.' },
