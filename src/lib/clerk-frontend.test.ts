@@ -8,4 +8,10 @@ describe('clerk frontend key', () => {
     assert.equal(clerkFrontendApi(`pk_test_${encoded}`), 'foo.clerk.accounts.dev');
     assert.equal(clerkKeyKind(`pk_test_${encoded}`), 'test');
   });
+
+  it('tolerates a trailing CR on the key', () => {
+    const encoded = Buffer.from('foo.clerk.accounts.dev$').toString('base64');
+    assert.equal(clerkFrontendApi(`pk_test_${encoded}\r`), 'foo.clerk.accounts.dev');
+    assert.equal(clerkKeyKind(`pk_test_${encoded}\r`), 'test');
+  });
 });

@@ -297,14 +297,15 @@ export async function updateProject(scope: Scope, projectId: string, input: unkn
       );
     }
 
-    // ISO strings — Date objects have poisoned Workers/postgres.js isolates.
-    const now = new Date().toISOString();
+    // Date objects for drizzle timestamp columns. mapToDriverValue turns them
+    // into ISO strings before postgres.js; a pre-stringified value throws.
+    const now = new Date();
     const [row] = await tx
       .update(projects)
       .set({
         ...fields,
-        updatedAt: now as unknown as Date,
-        lastTouched: now as unknown as Date,
+        updatedAt: now,
+        lastTouched: now,
         version: existing.version + 1,
         lastMutationId: mutationId,
       })

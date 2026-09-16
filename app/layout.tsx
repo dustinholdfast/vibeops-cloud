@@ -3,6 +3,7 @@ import { ClerkProvider } from '@clerk/nextjs';
 import { dark } from '@clerk/themes';
 import './globals.css';
 import { DraftSession } from '@/src/components/DraftSession';
+import { env } from '@/src/lib/env';
 
 export const metadata: Metadata = {
   title: 'Noxen',
@@ -36,7 +37,7 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const publishableKey = env('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY');
 
   const html = (
     <html lang="en" className="h-full dark" suppressHydrationWarning>
