@@ -1,5 +1,5 @@
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
-import { requireDb } from './index';
+import { requireDb, withDb } from './index';
 import { dropMonitoringFor } from './project-service';
 import { projects, workspaceInvites, workspaceMembers, workspaces } from './schema';
 import { ProjectError, validateId } from '../lib/project-validation';
@@ -163,23 +163,25 @@ export async function ensurePersonalWorkspace(userId: string): Promise<Membershi
 
 /** Every workspace the user belongs to, personal first, then by name. */
 export async function listWorkspaces(userId: string): Promise<Membership[]> {
-  await ensurePersonalWorkspace(userId);
+  return withDb(async () => {
+    await ensurePersonalWorkspace(userId);
 
-  const rows = await requireDb()
-    .select({
-      workspaceId: workspaces.id,
-      name: workspaces.name,
-      personal: workspaces.personal,
-      ownerUserId: workspaces.ownerUserId,
-      role: workspaceMembers.role,
-    })
-    .from(workspaceMembers)
-    .innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
-    .where(eq(workspaceMembers.userId, userId));
+    const rows = await requireDb()
+      .select({
+        workspaceId: workspaces.id,
+        name: workspaces.name,
+        personal: workspaces.personal,
+        ownerUserId: workspaces.ownerUserId,
+        role: workspaceMembers.role,
+      })
+      .from(workspaceMembers)
+      .innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
+      .where(eq(workspaceMembers.userId, userId));
 
-  return rows
-    .map(toMembership)
-    .sort((a, b) => Number(b.personal) - Number(a.personal) || a.name.localeCompare(b.name));
+    return rows
+      .map(toMembership)
+      .sort((a, b) => Number(b.personal) - Number(a.personal) || a.name.localeCompare(b.name));
+  });
 }
 
 /**

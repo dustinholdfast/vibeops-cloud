@@ -512,6 +512,50 @@ describe('session expiry', () => {
     assert.equal(shown('p1').progress, 77, 'the edit must stay on screen');
     assert.match(state().drafts.p1!.error!, /sign in again/i);
   });
+
+  it('surfaces a failed list so the dashboard is not left spinning', async () => {
+    handler = () => json(503, { error: 'Could not save or load your projects. Please try again.', code: 'SERVICE_UNAVAILABLE' });
+    await state().loadProjects(USER);
+
+    assert.equal(state().loadStatus, 'error');
+    assert.match(state().loadError!, /save or load your projects/i);
+  });
+
+  it('retries a failed list when the account is passed in', async () => {
+    handler = () => json(401, { error: 'Please sign in again.', code: 'UNAUTHORIZED' });
+    await state().loadProjects(USER);
+    assert.equal(state().loadStatus, 'error');
+
+    handler = () => json(200, { projects: [serverProject()] });
+    await state().loadProjects(USER);
+
+    assert.equal(state().loadStatus, 'ready');
+    assert.equal(state().projects.length, 1);
+  });
+
+  it('does not load when the session was cleared and no account is given', async () => {
+    handler = () => json(200, { projects: [serverProject()] });
+    state().resetSession();
+    await state().loadProjects();
+
+    assert.equal(state().loadStatus, 'idle');
+    assert.equal(calls.length, 0);
+  });
+
+  it('ignores a list response after the session is reset mid-flight', async () => {
+    let finish!: (res: Response) => void;
+    handler = () =>
+      new Promise<Response>((resolve) => {
+        finish = resolve;
+      });
+    const pending = state().loadProjects(USER);
+    state().resetSession();
+    finish(json(200, { projects: [serverProject()] }));
+    await pending;
+
+    assert.equal(state().projects.length, 0);
+    assert.equal(state().loadStatus, 'idle');
+  });
 });
 
 describe('workspaces', () => {

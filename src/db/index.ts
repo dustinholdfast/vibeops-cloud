@@ -140,11 +140,15 @@ export function requireDb(): Database {
           fetch_types: false,
           idle_timeout: 20,
           /**
-           * Without this, a suspended Neon branch (or a wedged TCP path) leaves
-           * the request hanging until workerd cancels it with a opaque 1101.
-           * Prefer a fast, named failure the cron can surface.
+           * Neon scale-to-zero: the first TCP attempt after idle is what wakes
+           * the compute, and that often takes longer than five seconds. 5s was
+           * chosen so a wedged path fails before workerd's opaque 1101; it is
+           * also short enough that a sleeping branch never finishes waking, so
+           * `/api/projects` 503s after sign-in. 10s is inside the client's 15s
+           * fetch budget and is what Neon recommends for cold start. {@link withDb}
+           * retries once if this still loses the race.
            */
-          connect_timeout: 5,
+          connect_timeout: 10,
         }
       : {}),
   });
@@ -182,4 +186,35 @@ export async function closeDb() {
 export function resetDb() {
   client = null;
   database = null;
+}
+
+/**
+ * A socket that never came up. Distinct from a query error so a retry cannot
+ * turn a 409 into a duplicate write.
+ *
+ * postgres.js reports these as `write CONNECT_TIMEOUT host:port`.
+ */
+export function isConnectError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /CONNECT_TIMEOUT|CONNECTION_CLOSED|CONNECT_CLOSED|ECONNRESET|EPIPE|connection timed out/i.test(
+    message
+  );
+}
+
+/**
+ * Run a database operation, and if the socket never came up, drop the cached
+ * handle and try once more.
+ *
+ * A suspended Neon compute is woken by the first TCP attempt. That attempt
+ * often loses to `connect_timeout`; the retry then lands on a live compute.
+ * Do not retry application errors — a 409 must stay a 409.
+ */
+export async function withDb<T>(operation: (db: Database) => Promise<T>): Promise<T> {
+  try {
+    return await operation(requireDb());
+  } catch (error) {
+    if (!isConnectError(error)) throw error;
+    resetDb();
+    return await operation(requireDb());
+  }
 }
