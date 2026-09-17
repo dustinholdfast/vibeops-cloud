@@ -3,6 +3,7 @@ import postgres from 'postgres';
 import { after } from 'next/server';
 import * as schema from './schema';
 import { env } from '../lib/env';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
 
 /**
  * The database handle, created on first use.
@@ -104,13 +105,33 @@ function scheduleRequestRelease() {
   }
 }
 
+
+/**
+ * Prefer Cloudflare Hyperdrive when bound — Workers cannot reliably open a
+ * direct TCP socket to Neon (CONNECT_TIMEOUT), while Hyperdrive can.
+ * Falls back to DATABASE_URL for Node/tests.
+ */
+function resolveConnectionString(): string | undefined {
+  if (onWorkers) {
+    try {
+      const hd = getCloudflareContext().env.HYPERDRIVE as
+        | { connectionString?: string }
+        | undefined;
+      if (hd?.connectionString) return hd.connectionString;
+    } catch {
+      // Outside a request context (build/tests) — fall through.
+    }
+  }
+  return env('DATABASE_URL');
+}
+
 export function requireDb(): Database {
   if (database) {
     scheduleRequestRelease();
     return database;
   }
 
-  const raw = env('DATABASE_URL');
+  const raw = resolveConnectionString();
   if (!raw) {
     throw new Error('DATABASE_URL is not configured');
   }
@@ -148,7 +169,7 @@ export function requireDb(): Database {
            * fetch budget and is what Neon recommends for cold start. {@link withDb}
            * retries once if this still loses the race.
            */
-          connect_timeout: 10,
+          connect_timeout: 20,
         }
       : {}),
   });
@@ -210,11 +231,15 @@ export function isConnectError(error: unknown): boolean {
  * Do not retry application errors — a 409 must stay a 409.
  */
 export async function withDb<T>(operation: (db: Database) => Promise<T>): Promise<T> {
-  try {
-    return await operation(requireDb());
-  } catch (error) {
-    if (!isConnectError(error)) throw error;
-    resetDb();
-    return await operation(requireDb());
+  let last: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await operation(requireDb());
+    } catch (error) {
+      last = error;
+      if (!isConnectError(error)) throw error;
+      resetDb();
+    }
   }
+  throw last;
 }

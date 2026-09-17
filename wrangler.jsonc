@@ -47,6 +47,14 @@
    * transaction-mode pooler safe here.
    */
 
+
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "a50b3baf0a9c42a7960c573ac111fd13"
+    }
+  ],
+
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1

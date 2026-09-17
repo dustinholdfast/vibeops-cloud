@@ -1,5 +1,5 @@
 import { and, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm';
-import { requireDb, resetDb } from './index';
+import { requireDb, resetDb, withDb } from './index';
 import { projectChecks, projectMonitors, projects } from './schema';
 import { ProjectError } from '../lib/project-validation';
 import { can } from '../lib/workspace-roles';
@@ -93,7 +93,7 @@ export type DueMonitor = {
  */
 export async function monitorStorageReady(): Promise<boolean> {
   try {
-    await requireDb().execute(sql`select 1 from project_monitors limit 1`);
+    await withDb((db) => db.execute(sql`select 1 from project_monitors limit 1`));
     return true;
   } catch (error) {
     // 42P01, undefined_table: the migration genuinely has not run.
