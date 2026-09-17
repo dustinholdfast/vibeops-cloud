@@ -1,5 +1,5 @@
 import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
-import { requireDb } from './index';
+import { withDb } from './index';
 import { projectChecks, projectMonitors, projects, subscriptions } from './schema';
 import { dbProjectToDomain, domainToDbInsert } from './map';
 import { projectTransaction, type Transaction } from './project-transaction';
@@ -69,20 +69,24 @@ async function planLimit(tx: Transaction, workspace: Membership) {
 }
 
 export async function listProjects(scope: Scope) {
-  const rows = await requireDb()
-    .select()
-    .from(projects)
-    .where(eq(projects.workspaceId, scope.workspace.workspaceId))
-    .orderBy(desc(projects.lastTouched));
+  const rows = await withDb((db) =>
+    db
+      .select()
+      .from(projects)
+      .where(eq(projects.workspaceId, scope.workspace.workspaceId))
+      .orderBy(desc(projects.lastTouched))
+  );
   return { projects: rows.map(dbProjectToDomain) };
 }
 
 export async function getProject(scope: Scope, projectId: string) {
   const id = validateId(projectId);
-  const [row] = await requireDb()
-    .select()
-    .from(projects)
-    .where(and(eq(projects.id, id), eq(projects.workspaceId, scope.workspace.workspaceId)));
+  const [row] = await withDb((db) =>
+    db
+      .select()
+      .from(projects)
+      .where(and(eq(projects.id, id), eq(projects.workspaceId, scope.workspace.workspaceId)))
+  );
   if (!row) throw new ProjectError(404, 'NOT_FOUND', 'This project is no longer available.');
   return { project: dbProjectToDomain(row) };
 }

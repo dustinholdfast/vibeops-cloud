@@ -1,6 +1,7 @@
 'use client';
 import { useAuth } from '@clerk/nextjs';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { shouldResetDraftSession } from '../lib/draft-session';
 import { DRAFT_PREFIX, useProjectStore } from '../store/useProjectStore';
 
 /**
@@ -10,18 +11,20 @@ import { DRAFT_PREFIX, useProjectStore } from '../store/useProjectStore';
  */
 export function DraftSession() {
   const { isLoaded, userId } = useAuth();
+  const observedUserId = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
     if (!isLoaded) return;
-    const previous = useProjectStore.getState().userId;
-    const signedOut = !userId;
-    const switchedAccount = Boolean(previous && userId && previous !== userId);
-    if (!signedOut && !switchedAccount) return;
+    const previous = observedUserId.current;
+    const current = userId ?? null;
+    const shouldReset = shouldResetDraftSession(previous, current);
+    observedUserId.current = current;
+    if (!shouldReset) return;
 
     // Keep only the incoming account's drafts; one user must never see
     // another's. Keys are prefix + account + ':' + workspace, so an account may
     // legitimately hold one entry per workspace it belongs to.
-    const keep = userId ? DRAFT_PREFIX + userId + ':' : null;
+    const keep = current ? DRAFT_PREFIX + current + ':' : null;
     try {
       for (const key of Object.keys(sessionStorage)) {
         if (key.startsWith(DRAFT_PREFIX) && !(keep && key.startsWith(keep))) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { UserButton } from '@clerk/nextjs';
+import { UserButton, useAuth } from '@clerk/nextjs';
 import { Sidebar } from '@/src/components/Sidebar';
 import { Header } from '@/src/components/Header';
 import { StatusCards } from '@/src/components/StatusCards';
@@ -13,6 +13,7 @@ import { IntelligenceBand } from '@/src/components/IntelligenceBand';
 import { EmptyWorkspace } from '@/src/components/EmptyWorkspace';
 
 export function DashboardClient({ userId }: { userId: string }) {
+  const { isLoaded } = useAuth();
   const loadProjects = useProjectStore((s) => s.loadProjects);
   const loadWorkspaces = useProjectStore((s) => s.loadWorkspaces);
   const loadStatus = useProjectStore((s) => s.loadStatus);
@@ -21,9 +22,13 @@ export function DashboardClient({ userId }: { userId: string }) {
   const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
+    // Wait until Clerk has settled so DraftSession cannot treat the handshake
+    // gap as a sign-out and discard the list response, and so /api/projects
+    // is not fetched before the session cookie is usable.
+    if (!isLoaded) return;
     void loadProjects(userId);
     void loadWorkspaces();
-  }, [loadProjects, loadWorkspaces, userId]);
+  }, [isLoaded, loadProjects, loadWorkspaces, userId]);
 
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
@@ -63,7 +68,7 @@ export function DashboardClient({ userId }: { userId: string }) {
             <p className="text-xs text-text-dim max-w-md">{loadError || 'Please try again in a moment.'}</p>
             <button
               type="button"
-              onClick={() => void loadProjects()}
+              onClick={() => void loadProjects(userId)}
               className="px-3 py-1.5 rounded-lg bg-purple text-white text-sm font-medium"
             >
               Retry

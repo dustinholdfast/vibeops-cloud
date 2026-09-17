@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { projects } from './schema';
-import { dbProjectToDomain, domainToDbInsert } from './map';
+import { dbProjectToDomain, domainToDbInsert, timestampToIso } from './map';
 import type { DbProject } from './schema';
 import type { Project } from '../types';
 
@@ -73,5 +73,47 @@ describe('dbProjectToDomain', () => {
     const project = dbProjectToDomain(row);
     assert.equal(project.lastTouched, NOW);
     assert.equal(project.createdAt, NOW);
+  });
+
+  it('accepts timestamp strings from postgres.js with fetch_types: false', () => {
+    const row = {
+      id: 'proj_1',
+      version: 1,
+      lastMutationId: null,
+      workspaceId: 'ws_1',
+      userId: 'user_1',
+      name: 'Noxen',
+      nextAction: 'Ship the save',
+      stage: 'Building',
+      priority: 'Now',
+      health: 'On track',
+      targetDate: null,
+      lastTouched: NOW as unknown as Date,
+      createdAt: '2026-09-16 01:44:56.000+00' as unknown as Date,
+      liveUrl: null,
+      repoUrl: null,
+      progress: 0,
+      activity: [],
+      updatedAt: new Date(NOW),
+    } satisfies DbProject;
+
+    const project = dbProjectToDomain(row);
+    assert.equal(project.lastTouched, NOW);
+    assert.equal(project.createdAt, NOW);
+  });
+});
+
+describe('timestampToIso', () => {
+  it('passes Date objects through and parses postgres text timestamps', () => {
+    assert.equal(timestampToIso(new Date(NOW)), NOW);
+    assert.equal(timestampToIso(NOW), NOW);
+    assert.equal(timestampToIso('2026-09-16 01:44:56.000+00'), NOW);
+    assert.equal(timestampToIso('2026-09-16 01:44:56.000+00:00'), NOW);
+    assert.equal(timestampToIso('2026-09-16 01:44:56.000+0000'), NOW);
+  });
+
+  it('throws on empty or unusable values', () => {
+    assert.throws(() => timestampToIso(''), /Unusable timestamp/);
+    assert.throws(() => (NOW as unknown as { toISOString: () => string }).toISOString(), /toISOString is not a function/);
   });
 });
