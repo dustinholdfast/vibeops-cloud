@@ -11,6 +11,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { optionalTimestampToIso, timestampToIso, timestampToMs } from './map';
+import { projectMonitors } from './schema';
 import { isWithinManualCheckCooldown, MANUAL_CHECK_COOLDOWN_MS } from './monitor-service';
 
 const NOW = '2026-09-16T01:44:56.000Z';
@@ -42,6 +43,14 @@ describe('manual check timestamps from postgres.js fetch_types: false', () => {
       { lastCheckedAt: NOW, lastStatusChangeAt: null }
     );
     assert.equal(timestampToIso(POSTGRES_TEXT), NOW);
+  });
+
+  it('maps a monitor row through drizzle fromDriver the way Check now does', () => {
+    const lastCheckedAt = projectMonitors.lastCheckedAt.mapFromDriverValue(
+      '2026-09-16T01:44:56.000+00'
+    ) as Date;
+    assert.equal(optionalTimestampToIso(lastCheckedAt), NOW);
+    assert.equal(isWithinManualCheckCooldown(lastCheckedAt, new Date(timestampToMs(lastCheckedAt) + 1_000)), true);
   });
 
   it('enforces cooldown against a string lastCheckedAt', () => {
