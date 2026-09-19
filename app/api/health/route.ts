@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { desc, eq } from 'drizzle-orm';
 import { monitorStorageReady } from '@/src/db/monitor-service';
-import { withDb } from '@/src/db';
+import { hyperdriveConnectionString, withDb } from '@/src/db';
 import { projects } from '@/src/db/schema';
 import { dbProjectToDomain } from '@/src/db/map';
 import { env } from '@/src/lib/env';
@@ -78,6 +78,7 @@ export async function GET(req: Request) {
     service: 'noxen',
     phase: 3,
     hasDatabase: Boolean(env('DATABASE_URL')),
+    hasHyperdrive: Boolean(hyperdriveConnectionString()),
     hasClerk: Boolean(env('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY') && env('CLERK_SECRET_KEY')),
     hasCronSecret: Boolean(env('CRON_SECRET')),
     ...(deep

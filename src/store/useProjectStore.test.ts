@@ -521,6 +521,20 @@ describe('session expiry', () => {
     assert.match(state().loadError!, /save or load your projects/i);
   });
 
+  it('retries a 503 list once so a hard-refresh socket drop can recover', async () => {
+    let hits = 0;
+    handler = () => {
+      hits += 1;
+      if (hits === 1) return json(503, { error: 'Could not save or load your projects. Please try again.', code: 'SERVICE_UNAVAILABLE' });
+      return json(200, { projects: [serverProject()] });
+    };
+    await state().loadProjects(USER);
+
+    assert.equal(hits, 2);
+    assert.equal(state().loadStatus, 'ready');
+    assert.equal(state().projects.length, 1);
+  });
+
   it('retries a failed list when the account is passed in', async () => {
     handler = () => json(401, { error: 'Please sign in again.', code: 'UNAUTHORIZED' });
     await state().loadProjects(USER);

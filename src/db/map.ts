@@ -12,12 +12,16 @@ import type { DbProject, NewDbProject } from './schema';
  * Postgres text (`2026-09-16 01:44:56.000+00`) is also not a valid Date
  * input until the space is a `T` and `+00` is `+00:00`.
  */
-export function timestampToDate(value: Date | string): Date {
+export function timestampToDate(value: Date | string | number): Date {
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) {
       throw new TypeError('Invalid Date timestamp');
     }
     return value;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const fromNumber = new Date(value);
+    if (!Number.isNaN(fromNumber.getTime())) return fromNumber;
   }
   if (typeof value === 'string' && value.length > 0) {
     const parsed = new Date(normaliseTimestamp(value));
@@ -26,16 +30,35 @@ export function timestampToDate(value: Date | string): Date {
   throw new TypeError(`Unusable timestamp: ${String(value)}`);
 }
 
-export function timestampToIso(value: Date | string): string {
+export function timestampToIso(value: Date | string | number): string {
   return timestampToDate(value).toISOString();
 }
 
-export function timestampToMs(value: Date | string): number {
+export function timestampToMs(value: Date | string | number): number {
   return timestampToDate(value).getTime();
 }
 
-export function optionalTimestampToIso(value: Date | string | null | undefined): string | null {
+export function optionalTimestampToIso(
+  value: Date | string | number | null | undefined
+): string | null {
   return value == null ? null : timestampToIso(value);
+}
+
+/**
+ * Never throw from a list mapper. One unusable drizzle Date (Invalid Date
+ * after `mapFromDriverValue(new Date(postgresText))` on workerd) used to
+ * 503 the whole `/api/projects` payload.
+ */
+export function safeTimestampToIso(value: unknown, fallback = new Date().toISOString()): string {
+  try {
+    if (value instanceof Date || typeof value === 'string' || typeof value === 'number') {
+      return timestampToIso(value);
+    }
+  } catch {
+    // fall through
+  }
+  console.error('[projects] unusable timestamp, using fallback', value);
+  return fallback;
 }
 
 function normaliseTimestamp(value: string): string {
@@ -56,8 +79,8 @@ export function dbProjectToDomain(row: DbProject): Project {
     priority: row.priority as Project['priority'],
     health: row.health as Project['health'],
     targetDate: row.targetDate,
-    lastTouched: timestampToIso(row.lastTouched),
-    createdAt: timestampToIso(row.createdAt),
+    lastTouched: safeTimestampToIso(row.lastTouched),
+    createdAt: safeTimestampToIso(row.createdAt),
     liveUrl: row.liveUrl ?? undefined,
     repoUrl: row.repoUrl ?? undefined,
     progress: row.progress,

@@ -5,6 +5,7 @@ import {
   dbProjectToDomain,
   domainToDbInsert,
   optionalTimestampToIso,
+  safeTimestampToIso,
   timestampToDate,
   timestampToIso,
   timestampToMs,
@@ -108,6 +109,34 @@ describe('dbProjectToDomain', () => {
     assert.equal(project.lastTouched, NOW);
     assert.equal(project.createdAt, NOW);
   });
+
+  it('still serialises when drizzle has already turned postgres text into Invalid Date', () => {
+    const row = {
+      id: 'proj_1',
+      version: 1,
+      lastMutationId: null,
+      workspaceId: 'ws_1',
+      userId: 'user_1',
+      name: 'Noxen',
+      nextAction: 'Ship the save',
+      stage: 'Building',
+      priority: 'Now',
+      health: 'On track',
+      targetDate: null,
+      lastTouched: new Date('not a date'),
+      createdAt: new Date(NOW),
+      liveUrl: null,
+      repoUrl: null,
+      progress: 0,
+      activity: [],
+      updatedAt: new Date(NOW),
+    } satisfies DbProject;
+
+    const project = dbProjectToDomain(row);
+    assert.equal(project.createdAt, NOW);
+    assert.equal(typeof project.lastTouched, 'string');
+    assert.equal(Number.isNaN(Date.parse(project.lastTouched)), false);
+  });
 });
 
 describe('timestampToIso', () => {
@@ -138,5 +167,19 @@ describe('timestampToDate / timestampToMs', () => {
     assert.equal(optionalTimestampToIso(null), null);
     assert.equal(optionalTimestampToIso(undefined), null);
     assert.equal(optionalTimestampToIso('2026-09-16 01:44:56.000+00'), NOW);
+  });
+
+  it('accepts unix-ms numbers from some postgres.js parsers', () => {
+    assert.equal(timestampToIso(Date.parse(NOW)), NOW);
+  });
+});
+
+describe('safeTimestampToIso', () => {
+  it('does not throw on Invalid Date or empty text so listProjects can still serialise', () => {
+    const fallback = '2026-01-01T00:00:00.000Z';
+    assert.equal(safeTimestampToIso(new Date(Number.NaN), fallback), fallback);
+    assert.equal(safeTimestampToIso('', fallback), fallback);
+    assert.equal(safeTimestampToIso(undefined, fallback), fallback);
+    assert.equal(safeTimestampToIso('2026-09-16 01:44:56.000+00', fallback), NOW);
   });
 });

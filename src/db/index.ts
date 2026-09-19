@@ -1,6 +1,5 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { after } from 'next/server';
 import * as schema from './schema';
 import { env } from '../lib/env';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
@@ -15,11 +14,14 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
  * unconfigured. Reading it on first call moves the lookup inside a request,
  * where the value exists.
  *
- * On Node the handle is cached for the process. On Workers it is cached for
- * the isolate but released after in-flight requests finish (refcount + after()).
- * Do not call `client.end()` from a request — that races siblings and cancels
- * them with Workers 1101. Do not use AsyncLocalStorage.enterWith — workerd
- * does not implement it.
+ * Cached for the isolate (Workers) or process (Node). Do not call
+ * `client.end()` from a request — that races siblings and cancels them with
+ * Workers 1101. Do not drop the cache from `after()` after every request
+ * either: hard-refresh fan-out (projects + workspaces + billing) then hits a
+ * new pool while the previous sockets are still draining, and GET
+ * `/api/projects` hangs (Worker status 0) or throws a socket read that
+ * `projectErrorResponse` used to hide as a generic 503. Reset only when a
+ * query actually loses the socket ({@link withDb}).
  */
 
 /** True inside workerd. Node and the build have no `navigator`. */
@@ -83,51 +85,32 @@ export function normaliseConnectionString(raw: string, workers = onWorkers): str
 }
 
 /**
- * In-flight Worker requests that borrowed the cached handle.
- *
- * The dashboard fans out projects + monitor + workspace calls on one isolate.
- * Refcount so the first request's `after()` cannot drop the handle under its
- * siblings. Never `end()` here — ending races holders and produces 1101s.
+ * Prefer Cloudflare Hyperdrive when bound — Workers cannot reliably open a
+ * direct TCP socket to Neon/Supabase (CONNECT_TIMEOUT), while Hyperdrive can.
+ * Falls back to DATABASE_URL for Node/tests.
  */
-let borrowCount = 0;
-
-function scheduleRequestRelease() {
-  if (!onWorkers) return;
-  borrowCount += 1;
+export function hyperdriveConnectionString(): string | undefined {
   try {
-    after(() => {
-      borrowCount = Math.max(0, borrowCount - 1);
-      if (borrowCount === 0) resetDb();
-    });
+    const hd = getCloudflareContext().env.HYPERDRIVE as
+      | { connectionString?: string }
+      | undefined;
+    return hd?.connectionString;
   } catch {
-    // `after()` only works inside a request/lifecycle context (not tests).
-    borrowCount = Math.max(0, borrowCount - 1);
+    // Outside a request context (build/tests).
+    return undefined;
   }
 }
 
-
-/**
- * Prefer Cloudflare Hyperdrive when bound — Workers cannot reliably open a
- * direct TCP socket to Neon (CONNECT_TIMEOUT), while Hyperdrive can.
- * Falls back to DATABASE_URL for Node/tests.
- */
 function resolveConnectionString(): string | undefined {
   if (onWorkers) {
-    try {
-      const hd = getCloudflareContext().env.HYPERDRIVE as
-        | { connectionString?: string }
-        | undefined;
-      if (hd?.connectionString) return hd.connectionString;
-    } catch {
-      // Outside a request context (build/tests) — fall through.
-    }
+    const fromHyperdrive = hyperdriveConnectionString();
+    if (fromHyperdrive) return fromHyperdrive;
   }
   return env('DATABASE_URL');
 }
 
 export function requireDb(): Database {
   if (database) {
-    scheduleRequestRelease();
     return database;
   }
 
@@ -161,21 +144,18 @@ export function requireDb(): Database {
           fetch_types: false,
           idle_timeout: 20,
           /**
-           * Neon scale-to-zero: the first TCP attempt after idle is what wakes
-           * the compute, and that often takes longer than five seconds. 5s was
-           * chosen so a wedged path fails before workerd's opaque 1101; it is
-           * also short enough that a sleeping branch never finishes waking, so
-           * `/api/projects` 503s after sign-in. 10s is inside the client's 15s
-           * fetch budget and is what Neon recommends for cold start. {@link withDb}
-           * retries once if this still loses the race.
+           * Must finish (and leave time for {@link withDb} to retry) inside the
+           * dashboard client's 15s fetch abort. Hyperdrive + Supabase is always
+           * on; the old 20s budget was for Neon scale-to-zero and let the first
+           * attempt outlive the browser, so hard refresh saw a hung
+           * `/api/projects` instead of a retry.
            */
-          connect_timeout: 20,
+          connect_timeout: 8,
         }
       : {}),
   });
 
   database = drizzle(client, { schema });
-  scheduleRequestRelease();
   return database;
 }
 
@@ -210,15 +190,33 @@ export function resetDb() {
 }
 
 /**
- * A socket that never came up. Distinct from a query error so a retry cannot
- * turn a 409 into a duplicate write.
+ * A socket that never came up or died mid-read. Distinct from a query error so
+ * a retry cannot turn a 409 into a duplicate write.
  *
- * postgres.js reports these as `write CONNECT_TIMEOUT host:port`.
+ * postgres.js usually reports `write CONNECT_TIMEOUT host:port`. The live
+ * Worker also throws a message-less Error whose stack is a `Socket` /
+ * `startRead` frame — `projectErrorResponse` logged that as
+ * `[projects] request failed` and the dashboard toasted the generic 503.
  */
 export function isConnectError(error: unknown): boolean {
+  const code =
+    typeof error === 'object' && error && 'code' in error
+      ? String((error as { code: unknown }).code)
+      : '';
   const message = error instanceof Error ? error.message : String(error);
-  return /CONNECT_TIMEOUT|CONNECTION_CLOSED|CONNECT_CLOSED|ECONNRESET|EPIPE|connection timed out/i.test(
-    message
+  const stack = error instanceof Error ? error.stack ?? '' : '';
+  const haystack = `${code}\n${message}\n${stack}`;
+  if (
+    /CONNECT_TIMEOUT|CONNECTION_CLOSED|CONNECT_CLOSED|CONNECTION_ENDED|CONNECTION_DESTROYED|ECONNRESET|EPIPE|ECONNREFUSED|ETIMEDOUT|connection timed out/i.test(
+      haystack
+    )
+  ) {
+    return true;
+  }
+  return (
+    error instanceof Error &&
+    !error.message &&
+    /Socket|startRead|internal_net/i.test(stack)
   );
 }
 
