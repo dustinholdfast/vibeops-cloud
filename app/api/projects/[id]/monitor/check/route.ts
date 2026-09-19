@@ -85,6 +85,6 @@ export async function POST(req: Request, ctx: Ctx) {
       notified: notified.length,
     });
   } catch (error) {
-    return projectErrorResponse(error);
+    return projectErrorResponse(error, 'Could not run that check. Please try again.');
   }
 }

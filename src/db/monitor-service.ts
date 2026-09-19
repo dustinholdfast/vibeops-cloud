@@ -1,5 +1,6 @@
 import { and, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { requireDb, resetDb, withDb } from './index';
+import { optionalTimestampToIso, timestampToDate, timestampToIso, timestampToMs } from './map';
 import { projectChecks, projectMonitors, projects } from './schema';
 import { ProjectError } from '../lib/project-validation';
 import { can } from '../lib/workspace-roles';
@@ -119,8 +120,8 @@ function toView(row: typeof projectMonitors.$inferSelect): MonitorView {
     intervalSeconds: row.intervalSeconds,
     failureThreshold: row.failureThreshold,
     status: row.status as MonitorStatus,
-    lastCheckedAt: row.lastCheckedAt?.toISOString() ?? null,
-    lastStatusChangeAt: row.lastStatusChangeAt?.toISOString() ?? null,
+    lastCheckedAt: optionalTimestampToIso(row.lastCheckedAt),
+    lastStatusChangeAt: optionalTimestampToIso(row.lastStatusChangeAt),
     lastError: row.lastError,
   };
 }
@@ -185,7 +186,7 @@ export async function getMonitorSnapshot(
     .limit(5000);
 
   const records: CheckRecord[] = rows.map((r) => ({
-    checkedAt: r.checkedAt,
+    checkedAt: timestampToDate(r.checkedAt),
     ok: r.ok === 1,
     latencyMs: r.latencyMs,
   }));
@@ -200,7 +201,7 @@ export async function getMonitorSnapshot(
     buckets: bucketize(records, new Date(now.getTime() - DAY_MS), now, 48),
     streakMs: currentStreakMs(records, now),
     recent: rows.slice(0, 20).map((r) => ({
-      checkedAt: r.checkedAt.toISOString(),
+      checkedAt: timestampToIso(r.checkedAt),
       ok: r.ok === 1,
       statusCode: r.statusCode,
       latencyMs: r.latencyMs,
@@ -255,12 +256,10 @@ export async function saveMonitor(
   const status = retargeted ? 'unknown' : (existing?.status ?? 'unknown');
   const consecutiveFailures = retargeted ? 0 : (existing?.consecutiveFailures ?? 0);
   const consecutiveSuccesses = retargeted ? 0 : (existing?.consecutiveSuccesses ?? 0);
-  const lastCheckedAt = retargeted ? null : (existing?.lastCheckedAt?.toISOString() ?? null);
-  const lastStatusChangeAt = retargeted
-    ? null
-    : (existing?.lastStatusChangeAt?.toISOString() ?? null);
+  const lastCheckedAt = retargeted ? null : optionalTimestampToIso(existing?.lastCheckedAt);
+  const lastStatusChangeAt = retargeted ? null : optionalTimestampToIso(existing?.lastStatusChangeAt);
   const lastError = retargeted ? null : (existing?.lastError ?? null);
-  const createdAt = existing?.createdAt?.toISOString() ?? at;
+  const createdAt = existing ? timestampToIso(existing.createdAt) : at;
   const timeoutMs = existing?.timeoutMs ?? 10_000;
   const workspaceId = scope.workspace.workspaceId;
 
@@ -384,7 +383,11 @@ export async function dueMonitors(now: Date = new Date(), limit = 100): Promise<
     .orderBy(projectMonitors.lastCheckedAt)
     .limit(limit);
 
-  return rows.map((row) => ({ ...row, status: row.status as MonitorStatus }));
+  return rows.map((row) => ({
+    ...row,
+    status: row.status as MonitorStatus,
+    lastStatusChangeAt: row.lastStatusChangeAt ? timestampToDate(row.lastStatusChangeAt) : null,
+  }));
 }
 
 /**
@@ -395,6 +398,21 @@ export async function dueMonitors(now: Date = new Date(), limit = 100): Promise<
  * database rather than in memory because there is no single process to hold it.
  */
 export const MANUAL_CHECK_COOLDOWN_MS = 15_000;
+
+/**
+ * Whether a manual check is still inside the cooldown window.
+ *
+ * Accepts Date or string: on Workers, `fetch_types: false` hands timestamps
+ * back as postgres text, and `lastCheckedAt.getTime()` is what turned "Check
+ * now" into the generic projects 503.
+ */
+export function isWithinManualCheckCooldown(
+  lastCheckedAt: Date | string | null | undefined,
+  now: Date
+): boolean {
+  if (!lastCheckedAt) return false;
+  return now.getTime() - timestampToMs(lastCheckedAt) < MANUAL_CHECK_COOLDOWN_MS;
+}
 
 /**
  * Loads a monitor for an on-demand check, proving the caller may act on it.
@@ -419,10 +437,7 @@ export async function monitorForCheck(
     throw new ProjectError(404, 'NOT_FOUND', 'This project is not being monitored yet.');
   }
 
-  if (
-    row.lastCheckedAt &&
-    now.getTime() - row.lastCheckedAt.getTime() < MANUAL_CHECK_COOLDOWN_MS
-  ) {
+  if (isWithinManualCheckCooldown(row.lastCheckedAt, now)) {
     throw new ProjectError(
       429,
       'TOO_MANY_REQUESTS',
@@ -440,7 +455,7 @@ export async function monitorForCheck(
     status: row.status as MonitorStatus,
     consecutiveFailures: row.consecutiveFailures,
     consecutiveSuccesses: row.consecutiveSuccesses,
-    lastStatusChangeAt: row.lastStatusChangeAt,
+    lastStatusChangeAt: row.lastStatusChangeAt ? timestampToDate(row.lastStatusChangeAt) : null,
   };
 }
 
@@ -727,7 +742,11 @@ export async function listWorkspaceUptime(
   const dayBy = new Map<string, CheckRecord[]>();
   for (const row of dayRows) {
     const forProject = dayBy.get(row.projectId) ?? [];
-    forProject.push({ checkedAt: row.checkedAt, ok: row.ok === 1, latencyMs: null });
+    forProject.push({
+      checkedAt: timestampToDate(row.checkedAt),
+      ok: row.ok === 1,
+      latencyMs: null,
+    });
     dayBy.set(row.projectId, forProject);
   }
 
@@ -752,7 +771,7 @@ export async function listWorkspaceUptime(
         url: monitor.url,
         status: monitor.status as MonitorStatus,
         enabled: monitor.enabled === 1,
-        lastCheckedAt: monitor.lastCheckedAt?.toISOString() ?? null,
+        lastCheckedAt: optionalTimestampToIso(monitor.lastCheckedAt),
         lastError: monitor.lastError,
         intervalSeconds: monitor.intervalSeconds,
         windows: {

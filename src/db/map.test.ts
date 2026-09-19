@@ -1,7 +1,14 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { projects } from './schema';
-import { dbProjectToDomain, domainToDbInsert, timestampToIso } from './map';
+import {
+  dbProjectToDomain,
+  domainToDbInsert,
+  optionalTimestampToIso,
+  timestampToDate,
+  timestampToIso,
+  timestampToMs,
+} from './map';
 import type { DbProject } from './schema';
 import type { Project } from '../types';
 
@@ -115,5 +122,21 @@ describe('timestampToIso', () => {
   it('throws on empty or unusable values', () => {
     assert.throws(() => timestampToIso(''), /Unusable timestamp/);
     assert.throws(() => (NOW as unknown as { toISOString: () => string }).toISOString(), /toISOString is not a function/);
+  });
+});
+
+describe('timestampToDate / timestampToMs', () => {
+  it('turns postgres text into a usable Date so monitor code can compare it', () => {
+    const parsed = timestampToDate('2026-09-16 01:44:56.000+00');
+    assert.equal(parsed instanceof Date, true);
+    assert.equal(parsed.toISOString(), NOW);
+    assert.equal(timestampToMs('2026-09-16 01:44:56.000+00'), Date.parse(NOW));
+    assert.equal(timestampToMs(new Date(NOW)), Date.parse(NOW));
+  });
+
+  it('leaves nullish monitor timestamps as null rather than throwing', () => {
+    assert.equal(optionalTimestampToIso(null), null);
+    assert.equal(optionalTimestampToIso(undefined), null);
+    assert.equal(optionalTimestampToIso('2026-09-16 01:44:56.000+00'), NOW);
   });
 });

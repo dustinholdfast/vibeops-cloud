@@ -4,24 +4,38 @@ import type { DbProject, NewDbProject } from './schema';
 /**
  * Drizzle types these as `Date`, but postgres.js on Workers runs with
  * `fetch_types: false`, so the driver may hand back a timestamp string.
- * Calling `.toISOString()` on a string throws, and `/api/projects` reports
- * that as a generic 503 — empty lists still "load" (zero rows to map).
+ * Calling `.toISOString()` or `.getTime()` on a string throws. `/api/projects`
+ * and the monitor/check routes used to report that as a generic 503 — empty
+ * project lists still "load" (zero rows to map), which is why the dashboard
+ * looked fine while "Check now" did not.
  *
  * Postgres text (`2026-09-16 01:44:56.000+00`) is also not a valid Date
  * input until the space is a `T` and `+00` is `+00:00`.
  */
-export function timestampToIso(value: Date | string): string {
+export function timestampToDate(value: Date | string): Date {
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) {
       throw new TypeError('Invalid Date timestamp');
     }
-    return value.toISOString();
+    return value;
   }
   if (typeof value === 'string' && value.length > 0) {
     const parsed = new Date(normaliseTimestamp(value));
-    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+    if (!Number.isNaN(parsed.getTime())) return parsed;
   }
   throw new TypeError(`Unusable timestamp: ${String(value)}`);
+}
+
+export function timestampToIso(value: Date | string): string {
+  return timestampToDate(value).toISOString();
+}
+
+export function timestampToMs(value: Date | string): number {
+  return timestampToDate(value).getTime();
+}
+
+export function optionalTimestampToIso(value: Date | string | null | undefined): string | null {
+  return value == null ? null : timestampToIso(value);
 }
 
 function normaliseTimestamp(value: string): string {
