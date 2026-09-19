@@ -13,7 +13,7 @@ import { IntelligenceBand } from '@/src/components/IntelligenceBand';
 import { EmptyWorkspace } from '@/src/components/EmptyWorkspace';
 
 export function DashboardClient({ userId }: { userId: string }) {
-  const { isLoaded } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
   const loadProjects = useProjectStore((s) => s.loadProjects);
   const loadWorkspaces = useProjectStore((s) => s.loadWorkspaces);
   const loadStatus = useProjectStore((s) => s.loadStatus);
@@ -24,11 +24,12 @@ export function DashboardClient({ userId }: { userId: string }) {
   useEffect(() => {
     // Wait until Clerk has settled so DraftSession cannot treat the handshake
     // gap as a sign-out and discard the list response, and so /api/projects
-    // is not fetched before the session cookie is usable.
-    if (!isLoaded) return;
+    // is not fetched before the session cookie is usable. Hard refresh can
+    // report isLoaded before isSignedIn; firing then used to 401/503 the list.
+    if (!isLoaded || !isSignedIn) return;
     void loadProjects(userId);
     void loadWorkspaces();
-  }, [isLoaded, loadProjects, loadWorkspaces, userId]);
+  }, [isLoaded, isSignedIn, loadProjects, loadWorkspaces, userId]);
 
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {

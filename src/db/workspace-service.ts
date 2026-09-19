@@ -198,19 +198,21 @@ export async function requireMembership(
   // common request path costs no extra writes.
   if (!workspaceId || workspaceId === userId) return personalMembership(userId);
 
-  const [row] = await requireDb()
-    .select({
-      workspaceId: workspaces.id,
-      name: workspaces.name,
-      personal: workspaces.personal,
-      ownerUserId: workspaces.ownerUserId,
-      role: workspaceMembers.role,
-    })
-    .from(workspaceMembers)
-    .innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
-    .where(
-      and(eq(workspaceMembers.userId, userId), eq(workspaceMembers.workspaceId, workspaceId))
-    );
+  const [row] = await withDb((db) =>
+    db
+      .select({
+        workspaceId: workspaces.id,
+        name: workspaces.name,
+        personal: workspaces.personal,
+        ownerUserId: workspaces.ownerUserId,
+        role: workspaceMembers.role,
+      })
+      .from(workspaceMembers)
+      .innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
+      .where(
+        and(eq(workspaceMembers.userId, userId), eq(workspaceMembers.workspaceId, workspaceId))
+      )
+  );
 
   if (!row) throw new ProjectError(404, 'NOT_FOUND', 'That workspace is not available.');
 

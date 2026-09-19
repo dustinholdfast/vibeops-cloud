@@ -523,7 +523,15 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     set({ userId: account, loadStatus: 'loading', loadError: null });
     const epoch = session;
     try {
-      const projects = await apiListProjects();
+      let projects: Project[];
+      try {
+        projects = await apiListProjects();
+      } catch (error) {
+        // One retry: a hard-refresh isolate can lose the first Hyperdrive
+        // socket; the 503 used to stick as "Could not load projects".
+        if (!(error instanceof ApiError && error.status === 503)) throw error;
+        projects = await apiListProjects();
+      }
       if (epoch !== session) return;
       let drafts = get().drafts;
       let creation = get().creation;
