@@ -29,6 +29,11 @@ describe('isConnectError', () => {
     assert.equal(isConnectError(error), true);
   });
 
+  it('retries a mid-read drop whose message is the only signal', () => {
+    assert.equal(isConnectError(new Error('CONNECTION_ENDED')), true);
+    assert.equal(isConnectError(new Error('server closed the connection unexpectedly')), true);
+  });
+
   it('does not retry application errors', () => {
     assert.equal(isConnectError(new Error('duplicate key value violates unique constraint')), false);
     assert.equal(isConnectError({ status: 409, code: 'CONFLICT' }), false);

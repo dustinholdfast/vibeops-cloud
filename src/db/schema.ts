@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   primaryKey,
 } from 'drizzle-orm/pg-core';
+import { pgTimestamptz } from './timestamps';
 
 /**
  * Projects are scoped to a workspace. Access is granted by membership in
@@ -33,13 +34,13 @@ export const projects = pgTable(
     priority: text('priority').notNull().default('Later'),
     health: text('health').notNull().default('On track'),
     targetDate: text('target_date'),
-    lastTouched: timestamp('last_touched', { withTimezone: true }).notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    lastTouched: pgTimestamptz('last_touched').notNull(),
+    createdAt: pgTimestamptz('created_at').notNull(),
     liveUrl: text('live_url'),
     repoUrl: text('repo_url'),
     progress: integer('progress').notNull().default(0),
     activity: jsonb('activity').notNull().default([]),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+    updatedAt: pgTimestamptz('updated_at').notNull(),
   },
   (t) => [
     index('projects_workspace_id_idx').on(t.workspaceId),
@@ -183,11 +184,11 @@ export const projectMonitors = pgTable(
     status: text('status').notNull().default('unknown'),
     consecutiveFailures: integer('consecutive_failures').notNull().default(0),
     consecutiveSuccesses: integer('consecutive_successes').notNull().default(0),
-    lastCheckedAt: timestamp('last_checked_at', { withTimezone: true }),
-    lastStatusChangeAt: timestamp('last_status_change_at', { withTimezone: true }),
+    lastCheckedAt: pgTimestamptz('last_checked_at'),
+    lastStatusChangeAt: pgTimestamptz('last_status_change_at'),
     lastError: text('last_error'),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+    createdAt: pgTimestamptz('created_at').notNull(),
+    updatedAt: pgTimestamptz('updated_at').notNull(),
   },
   (t) => [
     index('project_monitors_due_idx').on(t.enabled, t.lastCheckedAt),
@@ -201,7 +202,7 @@ export const projectChecks = pgTable(
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
     projectId: text('project_id').notNull(),
-    checkedAt: timestamp('checked_at', { withTimezone: true }).notNull(),
+    checkedAt: pgTimestamptz('checked_at').notNull(),
     /** 1 = the target answered healthily. Integer for consistency with the rest. */
     ok: integer('ok').notNull(),
     statusCode: integer('status_code'),

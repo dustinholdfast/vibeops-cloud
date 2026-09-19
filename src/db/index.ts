@@ -207,7 +207,7 @@ export function isConnectError(error: unknown): boolean {
   const stack = error instanceof Error ? error.stack ?? '' : '';
   const haystack = `${code}\n${message}\n${stack}`;
   if (
-    /CONNECT_TIMEOUT|CONNECTION_CLOSED|CONNECT_CLOSED|CONNECTION_ENDED|CONNECTION_DESTROYED|ECONNRESET|EPIPE|ECONNREFUSED|ETIMEDOUT|connection timed out/i.test(
+    /CONNECT_TIMEOUT|CONNECTION_CLOSED|CONNECT_CLOSED|CONNECTION_ENDED|CONNECTION_DESTROYED|ECONNRESET|EPIPE|ECONNREFUSED|ETIMEDOUT|connection timed out|connection terminated|server closed the connection/i.test(
       haystack
     )
   ) {

@@ -34,11 +34,9 @@ function domain(overrides: Partial<Project> = {}): Project {
 }
 
 describe('domainToDbInsert', () => {
-  it('gives drizzle timestamp columns Date objects, not ISO strings', () => {
+  it('binds timestamps as Dates that the column turns into ISO before postgres.js', () => {
     const row = domainToDbInsert('ws_1', 'user_1', domain());
 
-    // Drizzle's PgTimestamp mapper calls value.toISOString(). A string throws
-    // "toISOString is not a function", which /api/projects reports as 503.
     assert.equal(row.lastTouched instanceof Date, true);
     assert.equal(row.createdAt instanceof Date, true);
     assert.equal(row.updatedAt instanceof Date, true);
@@ -47,11 +45,8 @@ describe('domainToDbInsert', () => {
     assert.doesNotThrow(() => projects.updatedAt.mapToDriverValue(row.updatedAt));
   });
 
-  it('rejects the ISO-string binding that 8f5c5fb shipped', () => {
-    assert.throws(
-      () => projects.lastTouched.mapToDriverValue(NOW as unknown as Date),
-      /toISOString is not a function/
-    );
+  it('also accepts an ISO string so Workers never see a Date instance', () => {
+    assert.equal(projects.lastTouched.mapToDriverValue(NOW as unknown as Date), NOW);
   });
 });
 
@@ -137,6 +132,48 @@ describe('dbProjectToDomain', () => {
     assert.equal(typeof project.lastTouched, 'string');
     assert.equal(Number.isNaN(Date.parse(project.lastTouched)), false);
   });
+
+  it('list-serialises a row after drizzle mapFromDriverValue on string timestamptz', () => {
+    /**
+     * This is the /api/projects path: postgres.js fetch_types:false → drizzle
+     * mapFromDriverValue → dbProjectToDomain. The stock Date-mode mapper is
+     * `new Date(raw)` and turns `T` + `+00` into Invalid Date; our column
+     * normalises first so list never 503s on that format.
+     */
+    const lastTouched = projects.lastTouched.mapFromDriverValue(
+      '2026-09-16 01:44:56.000+00'
+    ) as Date;
+    const createdAt = projects.createdAt.mapFromDriverValue(
+      '2026-09-16T01:44:56.000+00'
+    ) as Date;
+    const updatedAt = projects.updatedAt.mapFromDriverValue(
+      '2026-09-16 01:44:56.000+00:00'
+    ) as Date;
+
+    const project = dbProjectToDomain({
+      id: 'proj_1',
+      version: 1,
+      lastMutationId: null,
+      workspaceId: 'ws_1',
+      userId: 'user_1',
+      name: 'Noxen',
+      nextAction: 'Ship the save',
+      stage: 'Building',
+      priority: 'Now',
+      health: 'On track',
+      targetDate: null,
+      lastTouched,
+      createdAt,
+      liveUrl: null,
+      repoUrl: null,
+      progress: 0,
+      activity: [],
+      updatedAt,
+    } satisfies DbProject);
+
+    assert.equal(project.lastTouched, NOW);
+    assert.equal(project.createdAt, NOW);
+  });
 });
 
 describe('timestampToIso', () => {
@@ -146,11 +183,20 @@ describe('timestampToIso', () => {
     assert.equal(timestampToIso('2026-09-16 01:44:56.000+00'), NOW);
     assert.equal(timestampToIso('2026-09-16 01:44:56.000+00:00'), NOW);
     assert.equal(timestampToIso('2026-09-16 01:44:56.000+0000'), NOW);
+    assert.equal(timestampToIso('2026-09-16T01:44:56.000+00'), NOW);
   });
 
   it('throws on empty or unusable values', () => {
     assert.throws(() => timestampToIso(''), /Unusable timestamp/);
     assert.throws(() => (NOW as unknown as { toISOString: () => string }).toISOString(), /toISOString is not a function/);
+  });
+
+  it('is the Invalid Date drizzle Date-mode produces for T+00 postgres text', () => {
+    // Same as PgTimestamp.mapFromDriverValue: new Date(raw), no normalisation.
+    const drizzleStyle = new Date('2026-09-16T01:44:56.000+00');
+    assert.equal(Number.isNaN(drizzleStyle.getTime()), true);
+    assert.throws(() => timestampToIso(drizzleStyle), /Invalid Date timestamp/);
+    assert.equal(timestampToIso('2026-09-16T01:44:56.000+00'), NOW);
   });
 });
 

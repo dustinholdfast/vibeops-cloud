@@ -1,73 +1,15 @@
 import type { Project, ActivityItem } from '@/src/types';
 import type { DbProject, NewDbProject } from './schema';
+import { safeTimestampToIso } from './timestamps';
 
-/**
- * Drizzle types these as `Date`, but postgres.js on Workers runs with
- * `fetch_types: false`, so the driver may hand back a timestamp string.
- * Calling `.toISOString()` or `.getTime()` on a string throws. `/api/projects`
- * and the monitor/check routes used to report that as a generic 503 — empty
- * project lists still "load" (zero rows to map), which is why the dashboard
- * looked fine while "Check now" did not.
- *
- * Postgres text (`2026-09-16 01:44:56.000+00`) is also not a valid Date
- * input until the space is a `T` and `+00` is `+00:00`.
- */
-export function timestampToDate(value: Date | string | number): Date {
-  if (value instanceof Date) {
-    if (Number.isNaN(value.getTime())) {
-      throw new TypeError('Invalid Date timestamp');
-    }
-    return value;
-  }
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    const fromNumber = new Date(value);
-    if (!Number.isNaN(fromNumber.getTime())) return fromNumber;
-  }
-  if (typeof value === 'string' && value.length > 0) {
-    const parsed = new Date(normaliseTimestamp(value));
-    if (!Number.isNaN(parsed.getTime())) return parsed;
-  }
-  throw new TypeError(`Unusable timestamp: ${String(value)}`);
-}
-
-export function timestampToIso(value: Date | string | number): string {
-  return timestampToDate(value).toISOString();
-}
-
-export function timestampToMs(value: Date | string | number): number {
-  return timestampToDate(value).getTime();
-}
-
-export function optionalTimestampToIso(
-  value: Date | string | number | null | undefined
-): string | null {
-  return value == null ? null : timestampToIso(value);
-}
-
-/**
- * Never throw from a list mapper. One unusable drizzle Date (Invalid Date
- * after `mapFromDriverValue(new Date(postgresText))` on workerd) used to
- * 503 the whole `/api/projects` payload.
- */
-export function safeTimestampToIso(value: unknown, fallback = new Date().toISOString()): string {
-  try {
-    if (value instanceof Date || typeof value === 'string' || typeof value === 'number') {
-      return timestampToIso(value);
-    }
-  } catch {
-    // fall through
-  }
-  console.error('[projects] unusable timestamp, using fallback', value);
-  return fallback;
-}
-
-function normaliseTimestamp(value: string): string {
-  let normalised = value.includes('T') ? value : value.replace(' ', 'T');
-  // ±HHMM then ±HH — postgres omits the colon that Date requires.
-  normalised = normalised.replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
-  normalised = normalised.replace(/([+-]\d{2})$/, '$1:00');
-  return normalised;
-}
+export {
+  optionalTimestampToIso,
+  pgTimestamptz,
+  safeTimestampToIso,
+  timestampToDate,
+  timestampToIso,
+  timestampToMs,
+} from './timestamps';
 
 export function dbProjectToDomain(row: DbProject): Project {
   return {
@@ -94,13 +36,9 @@ export function domainToDbInsert(
   p: Project
 ): NewDbProject {
   /**
-   * Drizzle timestamp columns, not raw SQL.
-   *
-   * PgTimestamp.mapToDriverValue calls `value.toISOString()`. Real Date
-   * objects survive that and become ISO strings *before* postgres.js sees
-   * them, which is what avoids the Workers "Received an instance of Date"
-   * poison. Passing an ISO string here throws `toISOString is not a function`
-   * and /api/projects reports it as a generic 503.
+   * `pgTimestamptz.toDriver` turns Date (or postgres text) into an ISO string
+   * *before* postgres.js sees it, which is what avoids the Workers "Received
+   * an instance of Date" poison.
    *
    * Raw `sql` fragments are the opposite: interpolate ISO strings and cast
    * `::timestamptz`. See `src/db/monitor-service.ts`.
