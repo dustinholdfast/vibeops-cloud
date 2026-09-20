@@ -27,7 +27,7 @@ type BillingStatus = {
   manageable: boolean;
 };
 
-export function WorkspaceMenu() {
+export function WorkspaceMenu({ collapsed = false }: { collapsed?: boolean }) {
   const workspaces = useProjectStore((s) => s.workspaces);
   const workspaceId = useProjectStore((s) => s.workspaceId);
   const workspaceError = useProjectStore((s) => s.workspaceError);
@@ -225,17 +225,32 @@ export function WorkspaceMenu() {
         ? `${billing.projectCount}`
         : `${billing.projectCount}/${billing.projectLimit}`;
 
+  const mark = (active?.name ?? 'Personal').trim().charAt(0).toUpperCase() || 'W';
+
   return (
-    <div ref={containerRef} className="relative px-2 pb-3">
+    <div ref={containerRef} className={cn('relative px-2 pb-3', collapsed && 'lg:px-1')}>
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-haspopup="menu"
+        title={active?.name ?? 'Personal'}
         disabled={switching || deleting}
-        className="flex w-full items-center gap-2 rounded-xl border border-border bg-surface-elevated px-2.5 py-2 text-left transition-colors hover:border-purple/40 disabled:opacity-60"
+        className={cn(
+          'flex w-full items-center gap-2 rounded-xl border border-border bg-surface-elevated px-2.5 py-2 text-left transition-colors hover:border-purple/40 disabled:opacity-60',
+          collapsed && 'lg:justify-center lg:px-0 lg:py-2'
+        )}
       >
-        <span className="min-w-0 flex-1">
+        <span
+          className={cn(
+            'hidden h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-purple/15 text-xs font-semibold text-purple-light',
+            collapsed && 'lg:flex'
+          )}
+          aria-hidden
+        >
+          {mark}
+        </span>
+        <span className={cn('min-w-0 flex-1', collapsed && 'lg:hidden')}>
           <span className="block truncate text-sm font-medium text-text">
             {active?.name ?? 'Personal'}
           </span>
@@ -245,15 +260,20 @@ export function WorkspaceMenu() {
           </span>
         </span>
         <span
-          className={
+          className={cn(
             billing?.plan === 'pro'
               ? 'rounded-full bg-purple/15 px-2 py-0.5 text-[10px] font-medium text-purple-light'
-              : 'rounded-full bg-surface px-2 py-0.5 text-[10px] font-medium text-text-muted'
-          }
+              : 'rounded-full bg-surface px-2 py-0.5 text-[10px] font-medium text-text-muted',
+            collapsed && 'lg:hidden'
+          )}
         >
           {planLabel}
         </span>
-        <ChevronsUpDown size={14} className="flex-shrink-0 text-text-dim" aria-hidden />
+        <ChevronsUpDown
+          size={14}
+          className={cn('flex-shrink-0 text-text-dim', collapsed && 'lg:hidden')}
+          aria-hidden
+        />
       </button>
 
       {workspaceError && (
@@ -265,7 +285,12 @@ export function WorkspaceMenu() {
       {open && (
         <div
           role="menu"
-          className="absolute bottom-full left-2 right-2 z-30 mb-1 rounded-xl border border-border bg-surface-elevated p-1 shadow-lg"
+          className={cn(
+            'absolute z-30 mb-1 rounded-xl border border-border bg-surface-elevated p-1 shadow-lg',
+            collapsed
+              ? 'bottom-0 left-full ml-2 w-64'
+              : 'bottom-full left-2 right-2'
+          )}
         >
           <p className="px-2 pt-1.5 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-dim">
             Switch
