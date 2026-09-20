@@ -7,8 +7,8 @@
  * present; either way this Worker stays a scheduler and nothing more.
  *
  * Two triggers share this Worker so digest mail does not depend on Vercel Cron:
- *   */5 * * * *   uptime sweep
- *   0 13 * * 1    weekly digest (Monday 13:00 UTC)
+ *   every five minutes — uptime sweep
+ *   Monday 13:00 UTC — weekly digest
  */
 
 export type Env = {
