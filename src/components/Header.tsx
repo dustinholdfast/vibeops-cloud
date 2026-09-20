@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { useProjectStore, MAX_NOW_SLOTS } from '../store/useProjectStore';
 import { format } from 'date-fns';
-import { Menu, Search, Plus, Download, Upload, Sun, Moon } from 'lucide-react';
+import { Menu, Search, Plus, Download, Upload, Sun, Moon, Sparkles } from 'lucide-react';
 import { useTheme } from '../lib/useTheme';
 import { downloadProjectsExport } from '../lib/export-projects';
 import type { Project } from '../types';
@@ -12,10 +12,12 @@ export function Header({
   account,
   onMenu,
   onPalette,
+  onCopilot,
 }: {
   account?: ReactNode;
   onMenu?: () => void;
   onPalette?: () => void;
+  onCopilot?: () => void;
 }) {
   const {
     search,
@@ -140,6 +142,17 @@ export function Header({
             className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-surface border border-border text-[11px] text-text-dim hover:text-text"
           >
             <kbd className="font-sans">⌘K</kbd>
+          </button>
+        )}
+        {onCopilot && (
+          <button
+            type="button"
+            onClick={onCopilot}
+            title="Workspace copilot (⌘J)"
+            className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-surface border border-border text-text-muted hover:text-text"
+            aria-label="Open workspace copilot"
+          >
+            <Sparkles size={16} />
           </button>
         )}
 

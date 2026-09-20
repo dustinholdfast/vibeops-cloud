@@ -17,6 +17,7 @@ import {
   Moon,
   Download,
   Activity,
+  Sparkles,
 } from 'lucide-react';
 import { useTheme } from '../lib/useTheme';
 import { useRouter } from 'next/navigation';
@@ -41,7 +42,15 @@ const STAGE_FILTERS: { key: FilterStage; label: string; icon: ReactNode }[] = [
   { key: 'Archived', label: 'Filter: Archived', icon: <Archive size={14} /> },
 ];
 
-export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+export function CommandPalette({
+  isOpen,
+  onClose,
+  onCopilot,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onCopilot?: () => void;
+}) {
   const { projects, openDrawer, requestAdd, setFilter, getExportPayload } = useProjectStore();
   const [search, setSearch] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -54,6 +63,19 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
     const matches = (label: string) => !q || label.toLowerCase().includes(q);
 
     const actions: Option[] = [
+      ...(onCopilot
+        ? [
+            {
+              id: 'act-copilot',
+              label: 'Open workspace copilot',
+              hint: '⌘J',
+              action: () => {
+                onCopilot();
+              },
+              icon: <Sparkles size={14} />,
+            },
+          ]
+        : []),
       {
         id: 'act-add',
         label: 'Add new project',
@@ -126,6 +148,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
     getExportPayload,
     setFilter,
     router,
+    onCopilot,
   ]);
 
   useEffect(() => {

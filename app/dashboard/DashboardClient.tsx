@@ -8,6 +8,7 @@ import { StatusCards } from '@/src/components/StatusCards';
 import { ProjectList } from '@/src/components/ProjectList';
 import { ProjectDrawer } from '@/src/components/ProjectDrawer';
 import { CommandPalette } from '@/src/components/CommandPalette';
+import { CopilotDrawer } from '@/src/components/CopilotDrawer';
 import { ToastHost } from '@/src/components/ToastHost';
 import { useProjectStore } from '@/src/store/useProjectStore';
 import { WorkspaceSaveNotice } from '@/src/components/SaveStatus';
@@ -44,12 +45,24 @@ export function DashboardClient({
   const projects = useProjectStore((s) => s.projects);
   const [navOpen, setNavOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [copilotOpen, setCopilotOpen] = useState(false);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      if (!(event.metaKey || event.ctrlKey)) return;
+      const key = event.key.toLowerCase();
+      if (key === 'k') {
         event.preventDefault();
         setPaletteOpen((open) => !open);
+        return;
+      }
+      if (key === 'j') {
+        const target = event.target as HTMLElement | null;
+        if (target && (target.closest('input, textarea, [contenteditable="true"]') || target.isContentEditable)) {
+          return;
+        }
+        event.preventDefault();
+        setCopilotOpen((open) => !open);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -115,6 +128,7 @@ export function DashboardClient({
               <Header
                 onMenu={() => setNavOpen(true)}
                 onPalette={() => setPaletteOpen(true)}
+                onCopilot={() => setCopilotOpen(true)}
                 account={
                   <UserButton
                     afterSignOutUrl="/"
@@ -137,7 +151,15 @@ export function DashboardClient({
       </main>
 
       <ProjectDrawer />
-      <CommandPalette isOpen={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <CopilotDrawer open={copilotOpen} onClose={() => setCopilotOpen(false)} />
+      <CommandPalette
+        isOpen={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        onCopilot={() => {
+          setPaletteOpen(false);
+          setCopilotOpen(true);
+        }}
+      />
       <ToastHost />
     </div>
   );

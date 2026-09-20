@@ -64,6 +64,7 @@
    *   EMAIL_FROM
    *   CRON_SECRET
    *   ADMIN_USER_IDS / ADMIN_EMAILS
+   *   ZAI_API_KEY                         workspace copilot (GLM-5.2)
    *
    * NEXT_PUBLIC_* values are inlined by Next at build time, so they must be
    * present in the build environment as well as set as secrets — a secret
