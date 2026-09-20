@@ -7,6 +7,7 @@ import {
 } from '@/src/db/monitor-service';
 import { applyProbe } from '@/src/lib/uptime/status';
 import { probe } from '@/src/lib/uptime/probe';
+import { probeContextFor } from '@/src/lib/uptime/probe-context';
 import { sendAlerts } from '@/src/lib/uptime/alerting';
 import { projectErrorResponse } from '@/src/lib/project-errors';
 import { requireScope } from '@/src/lib/request-scope';
@@ -38,7 +39,7 @@ export async function POST(req: Request, ctx: Ctx) {
     const now = new Date();
     const monitor = await monitorForCheck(scope, (await ctx.params).id, now);
 
-    const result = await probe(monitor.url, monitor.timeoutMs);
+    const result = await probe(monitor.url, monitor.timeoutMs, probeContextFor(req));
     const transition = applyProbe(
       {
         status: monitor.status,
@@ -80,6 +81,8 @@ export async function POST(req: Request, ctx: Ctx) {
       statusCode: result.statusCode,
       latencyMs: result.latencyMs,
       error: result.error,
+      via: result.via ?? null,
+      errorKind: result.errorKind ?? null,
       status: transition.status,
       alert: transition.alert,
       notified: notified.length,

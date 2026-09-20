@@ -9,6 +9,7 @@ import {
 } from '@/src/db/monitor-service';
 import { applyProbe, type Transition } from '@/src/lib/uptime/status';
 import { probe } from '@/src/lib/uptime/probe';
+import { probeContextFor } from '@/src/lib/uptime/probe-context';
 import { sendAlerts } from '@/src/lib/uptime/alerting';
 import { isEmailConfigured } from '@/src/lib/email/send';
 
@@ -49,6 +50,8 @@ type Outcome = {
   statusCode: number | null;
   latencyMs: number | null;
   error: string | null;
+  via: string | null;
+  errorKind: string | null;
   status: Transition['status'];
   alert: Transition['alert'];
   notified: string[];
@@ -152,8 +155,9 @@ export async function GET(req: Request) {
     const due = await dueMonitors(now, BATCH_LIMIT);
     const deadline = Date.now() + DISPATCH_BUDGET_MS;
 
-    const outcomes = await mapLimit(due, CONCURRENCY, deadline, async (monitor): Promise<Outcome> => {
-      const result = await probe(monitor.url, monitor.timeoutMs);
+      const probeCtx = probeContextFor(req);
+      const outcomes = await mapLimit(due, CONCURRENCY, deadline, async (monitor): Promise<Outcome> => {
+        const result = await probe(monitor.url, monitor.timeoutMs, probeCtx);
       const transition = applyProbe(
         {
           status: monitor.status,
@@ -190,11 +194,13 @@ export async function GET(req: Request) {
         projectId: monitor.projectId,
         projectName: monitor.projectName,
         url: monitor.url,
-        ok: result.ok,
-        statusCode: result.statusCode,
-        latencyMs: result.latencyMs,
-        error: result.error,
-        status: transition.status,
+          ok: result.ok,
+          statusCode: result.statusCode,
+          latencyMs: result.latencyMs,
+          error: result.error,
+          via: result.via ?? null,
+          errorKind: result.errorKind ?? null,
+          status: transition.status,
         alert: transition.alert,
         notified,
       };

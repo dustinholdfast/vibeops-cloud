@@ -244,18 +244,31 @@ export function UptimeCard({ project }: { project: Project }) {
             'rounded-lg border px-3 py-2 text-xs',
             result.ok
               ? 'border-success/40 bg-success/5 text-success'
-              : 'border-danger/40 bg-danger/5 text-danger'
+              : result.errorKind === 'cf_worker_fetch'
+                ? 'border-warning/40 bg-warning/5 text-warning'
+                : 'border-danger/40 bg-danger/5 text-danger'
           )}
         >
-          {result.ok ? 'Responding' : 'Not responding'}
-          {result.statusCode ? ` · HTTP ${result.statusCode}` : ''}
+          {result.ok
+            ? result.via === 'self' || result.via === 'health'
+              ? 'Responding · checked on this Worker'
+              : 'Responding'
+            : result.errorKind === 'cf_worker_fetch'
+              ? 'Check blocked by Cloudflare'
+              : 'Not responding'}
+          {result.statusCode && result.errorKind !== 'cf_worker_fetch'
+            ? ` · HTTP ${result.statusCode}`
+            : ''}
           {/* Latency is real whether or not the status was healthy: a 401 came
               back, and how fast it came back is still worth seeing. */}
           {result.latencyMs != null ? ` · ${result.latencyMs}ms` : ''}
           {/* The probe's error for a bad status is just "HTTP <code>", which
               the line above already said. Only a transport failure — no status
-              at all — carries a reason worth printing. */}
-          {!result.statusCode && result.error ? ` · ${result.error}` : ''}
+              at all — carries a reason worth printing. Cloudflare loop
+              failures have their own box below. */}
+          {!result.statusCode && result.error && result.errorKind !== 'cf_worker_fetch'
+            ? ` · ${result.error}`
+            : ''}
           {result.alert === 'down' ? ' · marked down' : ''}
           {result.alert === 'up' ? ' · recovered' : ''}
           {result.notified ? ` · emailed ${result.notified}` : ''}
@@ -274,6 +287,19 @@ export function UptimeCard({ project }: { project: Project }) {
           Deployment Protection returns {result.statusCode} for{' '}
           <em>every</em> path, including public ones, until it is turned off for
           production.
+        </p>
+      )}
+
+      {/* Same-zone Worker fetch is the other confusing 404: the site is often
+          fine (laptop curl is 200) and Cloudflare just refused the hop. */}
+      {result && !result.ok && result.errorKind === 'cf_worker_fetch' && (
+        <p className="rounded-lg border border-warning/40 bg-warning/5 px-3 py-2 text-xs text-text-muted">
+          Cloudflare does not let this Worker fetch that workers.dev URL from
+          the inside (same-zone loop). That is not the same as the site being
+          down — an external request can still return 200. This Worker is now
+          checked internally when the URL is ours. For another workers.dev
+          host, point the monitor at a custom domain or a public URL this
+          Worker can reach.
         </p>
       )}
 

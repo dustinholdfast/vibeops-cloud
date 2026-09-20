@@ -4,6 +4,7 @@
 interface __BaseEnv_CloudflareEnv {
 	HYPERDRIVE: Hyperdrive;
 	ASSETS: Fetcher;
+	SELF?: Fetcher;
 }
 declare namespace Cloudflare {
 	interface Env extends __BaseEnv_CloudflareEnv {}

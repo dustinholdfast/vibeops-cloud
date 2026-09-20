@@ -8,12 +8,20 @@
 
 export type MonitorStatus = 'unknown' | 'up' | 'down';
 
+/** How the HTTP check was performed. */
+export type ProbeVia = 'public' | 'self' | 'health';
+
+/** Distinguishes "the origin answered badly" from "Cloudflare blocked the hop". */
+export type ProbeErrorKind = 'cf_worker_fetch';
+
 /** The result of one HTTP probe. */
 export type ProbeOutcome = {
   ok: boolean;
   statusCode: number | null;
   latencyMs: number | null;
   error: string | null;
+  via?: ProbeVia;
+  errorKind?: ProbeErrorKind | null;
 };
 
 export type MonitorState = {

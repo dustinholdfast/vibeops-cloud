@@ -121,6 +121,8 @@ export type UptimeCheckResult = {
   statusCode?: number | null;
   latencyMs?: number | null;
   error?: string | null;
+  via?: 'public' | 'self' | 'health' | null;
+  errorKind?: 'cf_worker_fetch' | null;
   status?: MonitorStatus;
   alert?: 'up' | 'down' | null;
   /** How many people were emailed, when this check flipped the state. */
