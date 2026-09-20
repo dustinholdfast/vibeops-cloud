@@ -4,6 +4,7 @@ import type { Project } from '../types';
 import {
   compactProject,
   compactWorkspace,
+  copilotClientError,
   copilotSystemPrompt,
   describePatch,
   matchProject,
@@ -59,5 +60,13 @@ describe('copilot snapshot', () => {
     assert.match(prompt, /Noxen Cloud copilot/);
     assert.match(prompt, /Holdfast CRM/);
     assert.doesNotMatch(prompt, /a1/);
+  });
+
+  it('redacts bearer tokens and maps auth failures', () => {
+    assert.match(
+      copilotClientError(new Error('Unauthorized Bearer sk-secret-token')),
+      /rejected the API key/
+    );
+    assert.doesNotMatch(copilotClientError(new Error('Bearer sk-secret-token failed')), /sk-secret/);
   });
 });

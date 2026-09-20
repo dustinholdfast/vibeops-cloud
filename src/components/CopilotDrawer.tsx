@@ -9,6 +9,20 @@ import { WORKSPACE_HEADER, getActiveWorkspace } from '../lib/api';
 import { useProjectStore } from '../store/useProjectStore';
 import { cn } from '../lib/utils';
 
+function visibleCopilotError(error: Error | undefined): string | null {
+  if (!error) return null;
+  const raw = error.message.trim();
+  if (raw.startsWith('{')) {
+    try {
+      const body = JSON.parse(raw) as { error?: string };
+      if (typeof body.error === 'string' && body.error.trim()) return body.error;
+    } catch {
+      /* keep the raw message */
+    }
+  }
+  return raw || 'The copilot could not answer.';
+}
+
 function textOf(message: UIMessage): string {
   return message.parts
     .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
@@ -54,6 +68,7 @@ export function CopilotDrawer({ open, onClose }: { open: boolean; onClose: () =>
       void loadProjects();
     },
   });
+  const errorText = visibleCopilotError(error);
   const [draft, setDraft] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const busy = status === 'submitted' || status === 'streaming';
@@ -151,7 +166,7 @@ export function CopilotDrawer({ open, onClose }: { open: boolean; onClose: () =>
                   </div>
                 );
               })}
-              {error ? <p className="text-sm text-danger">{error.message}</p> : null}
+              {errorText ? <p className="text-sm text-danger">{errorText}</p> : null}
               <div ref={bottomRef} />
             </div>
 

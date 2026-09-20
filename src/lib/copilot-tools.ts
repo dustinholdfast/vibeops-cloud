@@ -89,24 +89,18 @@ export function copilotTools(scope: Scope) {
     }),
     updateProject: tool({
       description: 'Edit an existing project. Identify it by projectId or exact name.',
-      inputSchema: z
-        .object({
-          projectId: z.string().min(1).max(128).optional(),
-          name: z.string().min(1).max(200).optional(),
-          nextAction: z.string().min(1).max(4000).optional(),
-          stage: z.enum(STAGES).optional(),
-          priority: z.enum(PRIORITIES).optional(),
-          health: z.enum(HEALTHS).optional(),
-          progress: z.number().int().min(0).max(100).optional(),
-          targetDate: z
-            .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.null()])
-            .optional(),
-          liveUrl: optionalUrl,
-          repoUrl: optionalUrl,
-        })
-        .refine((value) => Boolean(value.projectId || value.name), {
-          message: 'Provide projectId or name.',
-        }),
+      inputSchema: z.object({
+        projectId: z.string().min(1).max(128).optional(),
+        name: z.string().min(1).max(200).optional(),
+        nextAction: z.string().min(1).max(4000).optional(),
+        stage: z.enum(STAGES).optional(),
+        priority: z.enum(PRIORITIES).optional(),
+        health: z.enum(HEALTHS).optional(),
+        progress: z.number().int().min(0).max(100).optional(),
+        targetDate: z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.null()]).optional(),
+        liveUrl: optionalUrl,
+        repoUrl: optionalUrl,
+      }),
       execute: async (input) => {
         try {
           const listed = await listProjects(scope);

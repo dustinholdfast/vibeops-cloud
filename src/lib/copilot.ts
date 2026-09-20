@@ -4,6 +4,9 @@ import { generateId } from './utils';
 
 export const COPILOT_AUTHOR = 'Noxen';
 export const COPILOT_MODEL = 'glm-5.2';
+export const COPILOT_KEY_ENV = 'ZAI_API_KEY';
+/** GLM Coding Plan keys use this host; pay-as-you-go keys use /api/paas/v4. */
+export const COPILOT_BASE_URL = 'https://api.z.ai/api/coding/paas/v4';
 const SNAPSHOT_LIMIT = 50;
 
 export type CopilotProject = {
@@ -97,6 +100,27 @@ export function copilotActivity(message: string, type: Project['activity'][numbe
 
 export function withCopilotActivity(project: Project, message: string, type: Project['activity'][number]['type'] = 'action') {
   return [copilotActivity(message, type), ...project.activity].slice(0, MAX_ACTIVITY_ENTRIES);
+}
+
+/** Safe text for the chat UI. Never include secrets. */
+export function copilotClientError(error: unknown): string {
+  const raw =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : 'The copilot could not answer.';
+  const cleaned = raw.replace(/Bearer\s+\S+/gi, 'Bearer [redacted]').replace(/sk-[A-Za-z0-9._-]+/g, '[redacted]');
+  if (/unauthoriz|invalid api key|incorrect api key|401/i.test(cleaned)) {
+    return 'Z.ai rejected the API key. Coding Plan keys need the coding endpoint; pay-as-you-go keys need https://api.z.ai/api/paas/v4.';
+  }
+  if (/404|not found|no such model/i.test(cleaned)) {
+    return 'Z.ai does not have that model on this key. Try glm-5.2 or set ZAI_BASE_URL for the matching API.';
+  }
+  if (/429|rate limit|quota|credit/i.test(cleaned)) {
+    return 'Z.ai rate-limited the request. Wait a moment and try again.';
+  }
+  return cleaned.slice(0, 400) || 'The copilot could not answer.';
 }
 
 export function copilotSystemPrompt(workspaceName: string, projects: CopilotProject[]): string {
