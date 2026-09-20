@@ -7,6 +7,7 @@ import { Header } from '@/src/components/Header';
 import { StatusCards } from '@/src/components/StatusCards';
 import { ProjectList } from '@/src/components/ProjectList';
 import { ProjectDrawer } from '@/src/components/ProjectDrawer';
+import { CommandPalette } from '@/src/components/CommandPalette';
 import { useProjectStore } from '@/src/store/useProjectStore';
 import { WorkspaceSaveNotice } from '@/src/components/SaveStatus';
 import { IntelligenceBand } from '@/src/components/IntelligenceBand';
@@ -20,6 +21,18 @@ export function DashboardClient({ userId }: { userId: string }) {
   const loadError = useProjectStore((s) => s.loadError);
   const projects = useProjectStore((s) => s.projects);
   const [navOpen, setNavOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setPaletteOpen((open) => !open);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   useEffect(() => {
     // Wait until Clerk has settled so DraftSession cannot treat the handshake
@@ -102,6 +115,7 @@ export function DashboardClient({ userId }: { userId: string }) {
       </main>
 
       <ProjectDrawer />
+      <CommandPalette isOpen={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </div>
   );
 }
