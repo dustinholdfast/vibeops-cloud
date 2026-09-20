@@ -16,7 +16,7 @@
   // workers.dev, same-zone fetches via global fetch return Cloudflare 1042 —
   // the VIBEOPS binding below is what makes the sweep actually reach the app.
   "vars": {
-    "APP_URL": "https://vibeops-cloud.dustin-eef.workers.dev"
+    "APP_URL": "https://noxencloud.com"
   },
 
   "services": [

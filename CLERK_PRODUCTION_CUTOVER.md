@@ -1,15 +1,15 @@
 # Clerk production cutover
 
-Noxen Cloud currently uses a Clerk **development** instance on
-`https://vibeops-cloud.dustin-eef.workers.dev`. Clerk production requires a
-custom domain; `*.workers.dev` and `*.vercel.app` cannot be used as the
-production domain. Swapping `pk_live_` onto this host would orphan every
-workspace id. `/api/health` reports `environment: staging` and the blockers
-until that domain exists.
+Noxen Cloud currently uses a Clerk **development** instance. The app host is
+`https://noxencloud.com` (Cloudflare Worker custom domain; `workers.dev` is
+rollback). Clerk production still requires `pk_live_` / `sk_live_` on that
+exact domain. Swapping live keys without the user-id mapping would orphan
+every workspace id. `/api/health` reports `environment: staging` until live
+keys are in place.
 
 ## Decisions required before cutover
 
-1. Choose the custom application domain, such as `app.example.com`.
+1. Custom application domain: `noxencloud.com` (attached). `www` 308s to apex.
 2. Decide whether accounts already created in the development instance are
    disposable or must retain their projects and subscriptions.
 
@@ -61,9 +61,8 @@ migration, which is why the pre-flight checks below matter.
 
 ## Safe cutover order
 
-1. Add the custom domain to the Cloudflare Worker (`vibeops-cloud`) and confirm
-   HTTPS is active. Keep `workers.dev` as rollback. Do not change Clerk keys
-   in the same step as DNS.
+1. Custom domain is attached (`noxencloud.com` + `www.noxencloud.com`). Keep
+   `workers.dev` as rollback. Do not change Clerk keys in the same step as DNS.
 2. Activate the Clerk production instance for that exact domain.
 3. Mirror the current sign-in methods, branding, session lifetime, and OAuth
    provider configuration in the production instance.

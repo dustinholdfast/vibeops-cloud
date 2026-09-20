@@ -20,6 +20,15 @@
    */
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
 
+  /**
+   * Custom domains. workers.dev stays up as rollback. Do not set
+   * workers_dev false until Clerk production on this host is verified.
+   */
+  "routes": [
+    { "pattern": "noxencloud.com", "custom_domain": true },
+    { "pattern": "www.noxencloud.com", "custom_domain": true }
+  ],
+
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"

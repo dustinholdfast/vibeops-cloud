@@ -37,7 +37,8 @@ function isPlatformHost(host: string | null): boolean {
  * configured, not a hardcoded number that drifts from the README.
  *
  * Production Clerk cannot run on workers.dev — swapping pk_live_ here would
- * orphan every workspace id. That stays a blocker until a custom domain exists.
+ * orphan every workspace id. noxencloud.com is the custom domain; live keys
+ * stay a separate blocker until the identity mapping is applied.
  */
 export function runtimeStatus(opts: { hasHyperdrive: boolean }): RuntimeStatus {
   const publishable = env('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY') ?? '';

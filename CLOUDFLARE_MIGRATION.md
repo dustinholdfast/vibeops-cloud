@@ -1,9 +1,10 @@
 # Vercel to Cloudflare Workers
 
-The application runs on Cloudflare Workers at
-`https://vibeops-cloud.dustin-eef.workers.dev` with Hyperdrive, a SELF loopback,
-and Clerk development keys. That host is **staging**. Clerk production still
-needs a custom domain — see `CLERK_PRODUCTION_CUTOVER.md`.
+The application runs on Cloudflare Workers at `https://noxencloud.com`
+(apex + `www`, with `https://vibeops-cloud.dustin-eef.workers.dev` kept as
+rollback). Hyperdrive, SELF, and Clerk **development** keys are live. Clerk
+production still needs `pk_live_` plus the user-id mapping — see
+`CLERK_PRODUCTION_CUTOVER.md`. Do not put live keys on `workers.dev`.
 
 `/api/health` reports `phase` from configured capabilities (database, Clerk,
 Stripe, cron), `environment: staging|production`, and `productionBlockers`.

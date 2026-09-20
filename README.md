@@ -18,8 +18,9 @@ Local edition: [dustinholdfast/vibeops](https://github.com/dustinholdfast/vibeop
 | Team workspaces (roles, invites) | ✅ |
 | Weekly digest email | ✅ (Cloudflare cron Worker, Monday 13:00 UTC) |
 | Uptime monitoring (per-project pings, history, alerts) | ✅ |
-| Staging on workers.dev | ✅ |
-| Clerk production (custom domain + pk_live_) | ⏳ blocked — see CLERK_PRODUCTION_CUTOVER.md |
+| Staging on workers.dev | ✅ rollback host |
+| Custom domain `noxencloud.com` | ✅ Worker custom domains (apex + www) |
+| Clerk production (`pk_live_` + user-id mapping) | ⏳ see CLERK_PRODUCTION_CUTOVER.md |
 
 ---
 

@@ -60,6 +60,15 @@ function clerkConfigured(): boolean {
 }
 
 export default function middleware(req: NextRequest, event: NextFetchEvent) {
+  const host = req.headers.get('host')?.split(':')[0] ?? '';
+  if (host === 'www.noxencloud.com') {
+    const url = req.nextUrl.clone();
+    url.hostname = 'noxencloud.com';
+    url.protocol = 'https:';
+    url.port = '';
+    return NextResponse.redirect(url, 308);
+  }
+
   if (clerkConfigured()) return withClerk(req, event);
 
   if (isPublicRoute(req)) {
