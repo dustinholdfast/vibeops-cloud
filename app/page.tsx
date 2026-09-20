@@ -4,9 +4,9 @@ import { getOptionalUserId, isClerkConfigured } from '@/src/lib/auth';
 import { GitHubAuthButton } from '@/src/components/GitHubAuthButton';
 
 const tiles = [
-  { title: 'Now slots', body: 'Three focus cards. Everything else waits.' },
-  { title: 'Rotting', body: 'Silence after seven days shows up on purpose.' },
-  { title: 'Workspaces', body: 'Personal by default. Invite a teammate when you need one.' },
+  { title: 'Three focus cards', body: 'Work on what matters today. Everything else waits its turn.' },
+  { title: 'Silent projects surface', body: 'Unfinished work shows up automatically after seven days.' },
+  { title: 'Workspaces', body: 'Personal by default. Invite teammates when you need them.' },
 ];
 
 export default async function HomePage() {
@@ -75,6 +75,7 @@ export default async function HomePage() {
                 See pricing
               </Link>
             </div>
+            <p className="text-xs text-text-dim">Free for up to 5 projects · No credit card required</p>
           </div>
         </div>
 

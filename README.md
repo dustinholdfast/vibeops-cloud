@@ -1,6 +1,6 @@
-# VibeOps Cloud
+# Noxen Cloud
 
-**Hosted, multi-tenant edition of VibeOps** — accounts, synced projects, Stripe subscriptions.
+**Hosted, multi-tenant edition of Noxen** — accounts, synced projects, Stripe subscriptions.
 
 Local edition: [dustinholdfast/vibeops](https://github.com/dustinholdfast/vibeops)
 
