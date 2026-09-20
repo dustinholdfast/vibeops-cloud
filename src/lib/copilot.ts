@@ -3,10 +3,8 @@ import { MAX_ACTIVITY_ENTRIES } from './project-validation';
 import { generateId } from './utils';
 
 export const COPILOT_AUTHOR = 'Noxen';
-export const COPILOT_MODEL = 'glm-5.2';
-export const COPILOT_KEY_ENV = 'ZAI_API_KEY';
-/** GLM Coding Plan keys use this host; pay-as-you-go keys use /api/paas/v4. */
-export const COPILOT_BASE_URL = 'https://api.z.ai/api/coding/paas/v4';
+export const COPILOT_MODEL = 'gemini-2.5-flash';
+export const COPILOT_KEY_ENV = 'GEMINI_API_KEY';
 const SNAPSHOT_LIMIT = 50;
 
 export type CopilotProject = {
@@ -110,15 +108,18 @@ export function copilotClientError(error: unknown): string {
       : typeof error === 'string'
         ? error
         : 'The copilot could not answer.';
-  const cleaned = raw.replace(/Bearer\s+\S+/gi, 'Bearer [redacted]').replace(/sk-[A-Za-z0-9._-]+/g, '[redacted]');
-  if (/unauthoriz|invalid api key|incorrect api key|401/i.test(cleaned)) {
-    return 'Z.ai rejected the API key. Coding Plan keys need the coding endpoint; pay-as-you-go keys need https://api.z.ai/api/paas/v4.';
+  const cleaned = raw
+    .replace(/Bearer\s+\S+/gi, 'Bearer [redacted]')
+    .replace(/sk-[A-Za-z0-9._-]+/g, '[redacted]')
+    .replace(/AIza[0-9A-Za-z_-]+/g, '[redacted]');
+  if (/unauthoriz|invalid api key|api_key_invalid|api key not valid|403/i.test(cleaned)) {
+    return 'Gemini rejected the API key. Put GEMINI_API_KEY from Google AI Studio on the Worker and try again.';
   }
   if (/404|not found|no such model/i.test(cleaned)) {
-    return 'Z.ai does not have that model on this key. Try glm-5.2 or set ZAI_BASE_URL for the matching API.';
+    return 'Gemini does not have that model on this key.';
   }
-  if (/429|rate limit|quota|credit/i.test(cleaned)) {
-    return 'Z.ai rate-limited the request. Wait a moment and try again.';
+  if (/429|rate limit|quota|resource.?exhausted/i.test(cleaned)) {
+    return 'Gemini rate-limited the request. Wait a moment and try again.';
   }
   return cleaned.slice(0, 400) || 'The copilot could not answer.';
 }

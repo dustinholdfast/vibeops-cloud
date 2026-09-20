@@ -68,5 +68,7 @@ describe('copilot snapshot', () => {
       /rejected the API key/
     );
     assert.doesNotMatch(copilotClientError(new Error('Bearer sk-secret-token failed')), /sk-secret/);
+    const googleKey = 'AIza' + 'SySecretTokenValue';
+    assert.doesNotMatch(copilotClientError(new Error('bad ' + googleKey)), /SySecret/);
   });
 });

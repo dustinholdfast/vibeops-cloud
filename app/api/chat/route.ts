@@ -4,12 +4,11 @@ import {
   streamText,
   type UIMessage,
 } from 'ai';
-import { createZai } from '@ai-sdk/zai';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import {
   compactWorkspace,
   copilotClientError,
   copilotSystemPrompt,
-  COPILOT_BASE_URL,
   COPILOT_KEY_ENV,
   COPILOT_MODEL,
 } from '@/src/lib/copilot';
@@ -29,13 +28,10 @@ function copilotModel() {
     throw new ProjectError(
       503,
       'COPILOT_UNCONFIGURED',
-      'The copilot is not configured. Add ZAI_API_KEY and reload.'
+      'The copilot is not configured. Add GEMINI_API_KEY and reload.'
     );
   }
-  return createZai({
-    apiKey,
-    baseURL: env('ZAI_BASE_URL') || COPILOT_BASE_URL,
-  })(COPILOT_MODEL);
+  return createGoogleGenerativeAI({ apiKey })(COPILOT_MODEL);
 }
 
 export async function GET(req: Request) {
@@ -44,7 +40,6 @@ export async function GET(req: Request) {
     return Response.json({
       configured: Boolean(env(COPILOT_KEY_ENV)),
       model: COPILOT_MODEL,
-      endpoint: env('ZAI_BASE_URL') || COPILOT_BASE_URL,
     });
   } catch (error) {
     return projectErrorResponse(error);

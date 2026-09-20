@@ -122,7 +122,7 @@ export function CopilotDrawer({ open, onClose }: { open: boolean; onClose: () =>
                   <Sparkles size={16} className="text-purple-light" />
                   Noxen
                 </h2>
-                <p className="text-xs text-text-dim mt-1">GLM-5.2 · can create and edit projects</p>
+                <p className="text-xs text-text-dim mt-1">Gemini 2.5 Flash · can create and edit projects</p>
               </div>
               <button
                 type="button"
