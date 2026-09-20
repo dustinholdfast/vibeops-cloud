@@ -1,5 +1,5 @@
 import { and, desc, eq, inArray, lt, or, isNull, sql } from 'drizzle-orm';
-import { requireDb, resetDb } from './index';
+import { isMissingRelationError, requireDb, withDb } from './index';
 import { emailPreferences, projects, workspaceMembers, workspaces } from './schema';
 import { dbProjectToDomain } from './map';
 import { buildPortfolioReview, REVIEW_WINDOW_DAYS } from '../lib/review';
@@ -175,17 +175,17 @@ export async function recordDigestSent(userId: string, now: Date = new Date()) {
 /** True when the digest tables are present; lets the cron report a clear reason. */
 export async function digestStorageReady(): Promise<boolean> {
   try {
-    await requireDb().execute(sql`select 1 from email_preferences limit 1`);
+    await withDb((db) => db.execute(sql`select 1 from email_preferences limit 1`));
     return true;
   } catch (error) {
     // 42P01, undefined_table: the migration genuinely has not run.
-    if ((error as { code?: unknown })?.code === '42P01') return false;
+    if (isMissingRelationError(error)) return false;
 
     // Anything else is a real failure. Swallowing it would make the digest
     // report "storage not ready" and mail nobody, week after week, while the
     // actual problem was that the database could not be reached.
-    // Drop a possibly-wedged cached handle so the next request can reconnect.
-    resetDb();
+    // Do not resetDb() here — withDb already retries connect errors. Resetting
+    // on every throw tears down the isolate pool under sibling requests.
     throw error;
   }
 }

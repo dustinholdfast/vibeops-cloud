@@ -220,6 +220,33 @@ export function isConnectError(error: unknown): boolean {
   );
 }
 
+/** Postgres undefined_table — the migration has not been applied. */
+export function isMissingRelationError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    String((error as { code: unknown }).code) === '42P01'
+  );
+}
+
+/**
+ * Whether a storage-ready probe should drop the isolate DB handle.
+ *
+ * Only a true connect/socket failure. A missing table is a migration
+ * question. Any other query error must not tear down the Hyperdrive pool —
+ * siblings in the same isolate (dashboard uptime card, Check now, projects)
+ * are still using it.
+ *
+ * {@link withDb} already resets on connect errors and retries. Callers such
+ * as `monitorStorageReady` must not call {@link resetDb} a second time, and
+ * must not reset on every thrown error.
+ */
+export function shouldResetIsolateOnStorageError(error: unknown): boolean {
+  if (isMissingRelationError(error)) return false;
+  return isConnectError(error);
+}
+
 /**
  * Run a database operation, and if the socket never came up, drop the cached
  * handle and try once more.
