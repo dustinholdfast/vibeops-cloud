@@ -77,18 +77,34 @@ interface ProjectState {
   healthFilter: FilterHealth;
   deadlineFilter: FilterDeadline;
   selectedId: string | null;
+  selectedIds: string[];
+  lastSelectedId: string | null;
+  /** Snapshots waiting for toast-undo or commit. Not shown in the list. */
+  pendingDeletes: Record<string, Project>;
   search: string;
   isDrawerOpen: boolean;
   loadStatus: 'idle' | 'loading' | 'ready' | 'error';
   loadError: string | null;
+  addRequested: boolean;
   setFilter: (f: FilterStage) => void;
   setHealthFilter: (f: FilterHealth) => void;
   setDeadlineFilter: (f: FilterDeadline) => void;
   setSearch: (s: string) => void;
   selectProject: (id: string | null) => void;
+  toggleSelected: (id: string, opts?: { range?: boolean; visibleIds?: string[] }) => void;
+  clearSelection: () => void;
+  selectVisible: (ids: string[]) => void;
   openDrawer: (id: string) => void;
   closeDrawer: () => void;
   loadProjects: (userId?: string) => Promise<void>;
+  hydrateDashboard: (snapshot: {
+    userId: string;
+    workspaceId: string | null;
+    workspaces: Workspace[];
+    projects: Project[];
+  }) => void;
+  requestAdd: () => void;
+  clearAddRequest: () => void;
   loadWorkspaces: () => Promise<void>;
   switchWorkspace: (workspaceId: string) => Promise<void>;
   createWorkspace: (name: string) => Promise<Workspace | null>;
@@ -109,6 +125,9 @@ interface ProjectState {
   setRepoUrl: (id: string, value: string | undefined) => void;
   touchProject: (id: string) => void;
   deleteProject: (id: string) => Promise<void>;
+  queueDelete: (ids: string[]) => string[];
+  undoDelete: (ids: string[]) => void;
+  commitDelete: (ids: string[]) => Promise<void>;
   addActivity: (id: string, item: Omit<ActivityItem, 'id' | 'timestamp'>) => void;
   getExportPayload: () => { version: 1; exportedAt: string; projects: Project[] };
   importProjects: (projects: Project[]) => Promise<void>;
@@ -388,16 +407,39 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   healthFilter: 'All',
   deadlineFilter: 'All',
   selectedId: null,
+  selectedIds: [],
+  lastSelectedId: null,
+  pendingDeletes: {},
   search: '',
   isDrawerOpen: false,
   loadStatus: 'idle',
   loadError: null,
+  addRequested: false,
 
   setFilter: (filter) => set({ filter }),
   setHealthFilter: (healthFilter) => set({ healthFilter }),
   setDeadlineFilter: (deadlineFilter) => set({ deadlineFilter }),
   setSearch: (search) => set({ search }),
   selectProject: (selectedId) => set({ selectedId }),
+  toggleSelected: (id, opts) => {
+    const selected = new Set(get().selectedIds);
+    const visible = opts?.visibleIds ?? get().projects.map((p) => p.id);
+    if (opts?.range && get().lastSelectedId) {
+      const from = visible.indexOf(get().lastSelectedId!);
+      const to = visible.indexOf(id);
+      if (from !== -1 && to !== -1) {
+        const [start, end] = from < to ? [from, to] : [to, from];
+        for (let i = start; i <= end; i++) selected.add(visible[i]);
+        set({ selectedIds: [...selected], lastSelectedId: id });
+        return;
+      }
+    }
+    if (selected.has(id)) selected.delete(id);
+    else selected.add(id);
+    set({ selectedIds: [...selected], lastSelectedId: id });
+  },
+  clearSelection: () => set({ selectedIds: [], lastSelectedId: null }),
+  selectVisible: (ids) => set({ selectedIds: [...ids], lastSelectedId: ids[ids.length - 1] ?? null }),
   openDrawer: (selectedId) => set({ selectedId, isDrawerOpen: true }),
   closeDrawer: () => set({ selectedId: null, isDrawerOpen: false }),
   reportError: (operationError) => set({ operationError, operationCode: 'CLIENT' }),
@@ -421,12 +463,16 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       operationCode: null,
       loadStatus: 'idle',
       loadError: null,
+      addRequested: false,
       selectedId: null,
       isDrawerOpen: false,
       search: '',
       filter: 'All',
       healthFilter: 'All',
       deadlineFilter: 'All',
+      selectedIds: [],
+      lastSelectedId: null,
+      pendingDeletes: {},
     });
   },
 
@@ -456,7 +502,8 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       state.operationBusy ||
       state.creating ||
       state.creation ||
-      Object.keys(state.drafts).length
+      Object.keys(state.drafts).length ||
+      Object.keys(state.pendingDeletes).length
     ) {
       set({
         operationError: 'Save or discard pending changes before switching workspace.',
@@ -480,6 +527,9 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       filter: 'All',
       healthFilter: 'All',
       deadlineFilter: 'All',
+      selectedIds: [],
+      lastSelectedId: null,
+      pendingDeletes: {},
       loadStatus: 'idle',
       operationError: null,
       operationCode: null,
@@ -504,6 +554,22 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     }
   },
 
+  hydrateDashboard: ({ userId, workspaceId, workspaces, projects }) => {
+    setActiveWorkspace(workspaceId);
+    set({
+      userId,
+      workspaceId,
+      workspaces,
+      projects,
+      loadStatus: 'ready',
+      loadError: null,
+      workspaceError: null,
+    });
+  },
+
+  requestAdd: () => set({ addRequested: true }),
+  clearAddRequest: () => set({ addRequested: false }),
+
   loadProjects: async (userId) => {
     const account = userId ?? get().userId;
     if (!account) return;
@@ -516,11 +582,17 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     if (
       get().loadStatus === 'loading' ||
       get().operationBusy ||
-      Object.values(get().drafts).some((d) => d.status === 'saving')
+      Object.values(get().drafts).some((d) => d.status === 'saving') ||
+      Object.keys(get().pendingDeletes).length
     ) {
       return;
     }
-    set({ userId: account, loadStatus: 'loading', loadError: null });
+    const silent = get().loadStatus === 'ready';
+    set({
+      userId: account,
+      loadError: null,
+      ...(silent ? {} : { loadStatus: 'loading' as const }),
+    });
     const epoch = session;
     try {
       let projects: Project[];
@@ -550,9 +622,14 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       for (const [id, draft] of Object.entries(drafts)) {
         if (!projects.some((p) => p.id === id)) merged.push(visible(draft));
       }
-      set({ projects: merged, drafts, creation, loadStatus: 'ready' });
+      set({ projects: merged, drafts, creation, loadStatus: 'ready', pendingDeletes: {} });
     } catch (error) {
-      if (epoch === session) set({ loadStatus: 'error', loadError: message(error) });
+      if (epoch !== session) return;
+      if (silent && get().projects.length) {
+        set({ operationError: message(error) });
+        return;
+      }
+      set({ loadStatus: 'error', loadError: message(error) });
     }
   },
 
@@ -712,7 +789,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       });
       return;
     }
-    const project = get().projects.find((p) => p.id === id);
+    const project = get().projects.find((p) => p.id === id) ?? get().pendingDeletes[id];
     if (!project) return;
     if (!Number.isInteger(project.version)) {
       set({
@@ -726,15 +803,93 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     try {
       await apiDeleteProject(id, project.version as number);
       if (epoch !== session) return;
-      set((s) => ({
-        projects: s.projects.filter((p) => p.id !== id),
-        selectedId: null,
-        isDrawerOpen: false,
-      }));
+      set((s) => {
+        const pendingDeletes = { ...s.pendingDeletes };
+        delete pendingDeletes[id];
+        return {
+          projects: s.projects.filter((p) => p.id !== id),
+          selectedId: s.selectedId === id ? null : s.selectedId,
+          isDrawerOpen: s.selectedId === id ? false : s.isDrawerOpen,
+          selectedIds: s.selectedIds.filter((sid) => sid !== id),
+          pendingDeletes,
+        };
+      });
     } catch (error) {
-      if (epoch === session) operationFailed(error);
+      if (epoch === session) {
+        operationFailed(error);
+        set((s) => {
+          const pending = s.pendingDeletes[id];
+          if (!pending || s.projects.some((p) => p.id === id)) return {};
+          const remaining = { ...s.pendingDeletes };
+          delete remaining[id];
+          return { pendingDeletes: remaining, projects: [pending, ...s.projects] };
+        });
+      }
     } finally {
       if (epoch === session) set({ operationBusy: false });
+    }
+  },
+
+  /** Hide projects immediately so the toast can undo before a server delete. */
+  queueDelete: (ids) => {
+    const unique = [...new Set(ids)];
+    const state = get();
+    if (state.operationBusy) {
+      set({
+        operationError: 'Wait for the workspace operation to finish before deleting projects.',
+        operationCode: 'CLIENT',
+      });
+      return [];
+    }
+    const queued: string[] = [];
+    const pendingDeletes = { ...state.pendingDeletes };
+    const blocked: string[] = [];
+    for (const id of unique) {
+      if (state.drafts[id] || pendingDeletes[id]) {
+        blocked.push(id);
+        continue;
+      }
+      const project = state.projects.find((p) => p.id === id);
+      if (!project) continue;
+      pendingDeletes[id] = project;
+      queued.push(id);
+    }
+    if (blocked.length) {
+      set({
+        operationError: 'Save or discard this project’s changes before deleting it.',
+        operationCode: 'CLIENT',
+      });
+    }
+    if (!queued.length) return queued;
+    const hidden = new Set(queued);
+    const selectedGone = state.selectedId ? hidden.has(state.selectedId) : false;
+    set({
+      pendingDeletes,
+      projects: state.projects.filter((p) => !hidden.has(p.id)),
+      selectedIds: state.selectedIds.filter((id) => !hidden.has(id)),
+      selectedId: selectedGone ? null : state.selectedId,
+      isDrawerOpen: selectedGone ? false : state.isDrawerOpen,
+    });
+    return queued;
+  },
+
+  undoDelete: (ids) => {
+    const pending = get().pendingDeletes;
+    const restore = ids.map((id) => pending[id]).filter(Boolean);
+    if (!restore.length) return;
+    const restored = new Set(restore.map((p) => p.id));
+    set((s) => {
+      const pendingDeletes = { ...s.pendingDeletes };
+      for (const id of restored) delete pendingDeletes[id];
+      const keep = s.projects.filter((p) => !restored.has(p.id));
+      return { pendingDeletes, projects: [...restore, ...keep] };
+    });
+  },
+
+  commitDelete: async (ids) => {
+    for (const id of ids) {
+      if (!get().pendingDeletes[id]) continue;
+      await get().deleteProject(id);
     }
   },
 
@@ -746,7 +901,13 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
 
   importProjects: async (incoming) => {
     // Import replaces everything, so it must not race unconfirmed per-project work.
-    if (get().operationBusy || get().creating || get().creation || Object.keys(get().drafts).length) {
+    if (
+      get().operationBusy ||
+      get().creating ||
+      get().creation ||
+      Object.keys(get().drafts).length ||
+      Object.keys(get().pendingDeletes).length
+    ) {
       set({
         operationError: 'Save or discard pending changes before replacing your workspace.',
         operationCode: 'CLIENT',
@@ -760,7 +921,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       const versions = Object.fromEntries(get().projects.map((p) => [p.id, p.version ?? 1]));
       const projects = await apiImportProjects(list, versions);
       if (epoch !== session) return;
-      set({ projects, selectedId: null, isDrawerOpen: false });
+      set({ projects, selectedId: null, isDrawerOpen: false, selectedIds: [], lastSelectedId: null, pendingDeletes: {} });
     } catch (error) {
       if (epoch === session) operationFailed(error);
     } finally {

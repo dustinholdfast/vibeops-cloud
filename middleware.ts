@@ -1,6 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server';
 import { env } from '@/src/lib/env';
+import { signInUrl } from '@/src/lib/sign-in-redirect';
 
 const isPublicRoute = createRouteMatcher([
   '/',
@@ -20,11 +21,11 @@ const isApiRoute = createRouteMatcher(['/api(.*)']);
 const withClerk = clerkMiddleware(async (auth, req) => {
   if (isPublicRoute(req)) return;
 
-  // protect() rewrites missing sessions to the Next 404 HTML page. The dashboard
-  // fetch()es /api/projects as JSON, so a missed cookie would otherwise surface
-  // as a missing route rather than an expired session.
+  // protect() rewrites missing sessions to the Next 404 HTML page. APIs must
+  // stay JSON 401 so a stale cookie does not look like a missing route. Pages
+  // send the user to /sign-in instead of that 404.
+  const { userId } = await auth();
   if (isApiRoute(req)) {
-    const { userId } = await auth();
     if (!userId) {
       return NextResponse.json(
         { error: 'Please sign in again.', code: 'UNAUTHORIZED' },
@@ -34,7 +35,11 @@ const withClerk = clerkMiddleware(async (auth, req) => {
     return;
   }
 
-  await auth.protect();
+  if (!userId) {
+    return NextResponse.redirect(
+      signInUrl(req.nextUrl.origin, req.nextUrl.pathname + req.nextUrl.search)
+    );
+  }
 });
 
 /**

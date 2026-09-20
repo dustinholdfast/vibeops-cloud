@@ -8,6 +8,7 @@ import { buildPortfolioReview, REVIEW_WINDOW_DAYS, type PortfolioReview } from '
 import { MAX_NOW_SLOTS, useProjectStore } from '../store/useProjectStore';
 import { cn } from '../lib/utils';
 import type { Project } from '../types';
+import { ActivitySparkline } from './ActivitySparkline';
 
 const WINDOW_OPTIONS = [REVIEW_WINDOW_DAYS, 14, 30];
 
@@ -109,6 +110,9 @@ export function IntelligenceBand() {
             <CountTile label="Advanced" value={review.advanced.length} tone="text-purple-light" onClick={() => setExpanded(true)} />
             <CountTile label="Slipped" value={review.slipped.length} tone="text-warning" onClick={() => setExpanded(true)} />
             <CountTile label="Stalled" value={review.stalled.length} tone="text-text-muted" onClick={() => setExpanded(true)} />
+          </div>
+          <div className="mt-3">
+            <ActivitySparkline projects={projects} />
           </div>
         </div>
       </div>

@@ -5,9 +5,18 @@ import { useProjectStore, MAX_NOW_SLOTS } from '../store/useProjectStore';
 import { format } from 'date-fns';
 import { Menu, Search, Plus, Download, Upload, Sun, Moon } from 'lucide-react';
 import { useTheme } from '../lib/useTheme';
+import { downloadProjectsExport } from '../lib/export-projects';
 import type { Project } from '../types';
 
-export function Header({ account, onMenu }: { account?: ReactNode; onMenu?: () => void }) {
+export function Header({
+  account,
+  onMenu,
+  onPalette,
+}: {
+  account?: ReactNode;
+  onMenu?: () => void;
+  onPalette?: () => void;
+}) {
   const {
     search,
     setSearch,
@@ -20,6 +29,8 @@ export function Header({ account, onMenu }: { account?: ReactNode; onMenu?: () =
     operationBusy,
     cancelCreation,
     reportError,
+    addRequested,
+    clearAddRequest,
   } = useProjectStore();
   const [newName, setNewName] = useState('');
   const [showAdd, setShowAdd] = useState(false);
@@ -35,15 +46,10 @@ export function Header({ account, onMenu }: { account?: ReactNode; onMenu?: () =
   }, [creation]);
 
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        searchRef.current?.focus();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+    if (!addRequested) return;
+    setShowAdd(true);
+    clearAddRequest();
+  }, [addRequested, clearAddRequest]);
 
   const nowCount = projects.filter((p) => p.priority === 'Now').length;
   let sub = 'Every active project gets one unambiguous next action.';
@@ -61,14 +67,7 @@ export function Header({ account, onMenu }: { account?: ReactNode; onMenu?: () =
   };
 
   const handleExport = () => {
-    const payload = getExportPayload();
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `noxen-export-${format(new Date(), 'yyyy-MM-dd')}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadProjectsExport(getExportPayload());
   };
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,15 +126,22 @@ export function Header({ account, onMenu }: { account?: ReactNode; onMenu?: () =
           <input
             ref={searchRef}
             type="text"
-            placeholder="Search projects"
+            placeholder="Filter list"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-40 sm:w-52 pl-9 pr-3 sm:pr-12 py-2 rounded-lg bg-surface border border-border text-sm text-text placeholder:text-text-dim focus:outline-none focus:border-purple/50 focus:ring-1 focus:ring-purple/30"
+            className="w-40 sm:w-52 pl-9 pr-3 py-2 rounded-lg bg-surface border border-border text-sm text-text placeholder:text-text-dim focus:outline-none focus:border-purple/50 focus:ring-1 focus:ring-purple/30"
           />
-          <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 hidden sm:inline text-[10px] text-text-dim border border-border rounded px-1.5 py-0.5">
-            ⌘K
-          </kbd>
         </div>
+        {onPalette && (
+          <button
+            type="button"
+            onClick={onPalette}
+            title="Command palette"
+            className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-surface border border-border text-[11px] text-text-dim hover:text-text"
+          >
+            <kbd className="font-sans">⌘K</kbd>
+          </button>
+        )}
 
         <button
           type="button"

@@ -17,6 +17,8 @@ import { X, ExternalLink, Github, Pencil, Check, Trash2, Hand, MessageSquarePlus
 import { SaveStatus } from './SaveStatus';
 import { GitHubPushButton } from './GitHubPushButton';
 import { UptimeCard } from './UptimeCard';
+import { RichText } from './RichText';
+import { toastDelete } from '../lib/dashboard-mutations';
 import { projectMomentum, type MomentumState } from '../lib/review';
 
 const stages: Stage[] = ['Exploring', 'Building', 'Testing', 'Live', 'Paused', 'Archived'];
@@ -32,7 +34,7 @@ const MOMENTUM_LABEL: Record<MomentumState, { text: string; tone: string; help: 
 export function ProjectDrawer() {
   const {
     projects, selectedId, isDrawerOpen, closeDrawer, setPriority, setStage, setNextAction,
-    setHealth, setTargetDate, setProgress, setLiveUrl, setRepoUrl, touchProject, addActivity, deleteProject,
+    setHealth, setTargetDate, setProgress, setLiveUrl, setRepoUrl, touchProject, addActivity,
   } = useProjectStore();
 
   const project = projects.find((p) => p.id === selectedId);
@@ -126,7 +128,7 @@ export function ProjectDrawer() {
                   <label htmlFor="drawer-progress" className="text-[11px] uppercase tracking-wider text-text-dim">Progress</label>
                   <span className="text-sm tabular-nums text-text">{project.progress}%</span>
                 </div>
-                <input id="drawer-progress" type="range" min={0} max={100} step={5} value={project.progress} onChange={(e) => setProgress(project.id, Number(e.target.value))} className="mt-2 w-full accent-purple" />
+                <input id="drawer-progress" type="range" min={0} max={100} step={10} value={project.progress} onChange={(e) => setProgress(project.id, Number(e.target.value))} className="mt-2 w-full accent-purple" />
                 <div className="mt-1 h-1.5 rounded-full bg-border-subtle overflow-hidden">
                   <div className="h-full rounded-full bg-gradient-to-r from-purple to-blue" style={{ width: `${project.progress}%` }} />
                 </div>
@@ -145,7 +147,19 @@ export function ProjectDrawer() {
                     </div>
                   </div>
                 ) : (
-                  <p className="mt-2 text-sm text-text rounded-xl border border-border bg-surface-elevated/60 px-3 py-2.5">{project.nextAction || <span className="text-text-dim italic">No next action defined</span>}</p>
+                  <div
+                    className="mt-2 w-full text-left rounded-xl border border-border bg-surface-elevated/60 px-3 py-2.5"
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).closest('input, a, button, label')) return;
+                      setEditingAction(true);
+                    }}
+                  >
+                    <RichText
+                      text={project.nextAction}
+                      empty="No next action defined"
+                      onToggleChecklist={(next) => setNextAction(project.id, next)}
+                    />
+                  </div>
                 )}
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <p className="text-xs text-text-dim">Last touched {formatLastTouched(project.lastTouched)}</p>
@@ -202,7 +216,7 @@ export function ProjectDrawer() {
                     <div key={item.id} className="flex gap-3">
                       <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-purple flex-shrink-0" aria-hidden />
                       <div className="min-w-0">
-                        <p className="text-sm text-text">{item.message}</p>
+                        <RichText text={item.message} className="text-sm" empty="" />
                         <p className="text-xs text-text-dim mt-0.5">{item.author && `${item.author} \u00b7 `}{formatLastTouched(item.timestamp)}</p>
                       </div>
                     </div>
@@ -211,7 +225,7 @@ export function ProjectDrawer() {
               </div>
             </div>
             <div className="px-5 py-4 border-t border-border-subtle flex items-center justify-between">
-              <button type="button" onClick={() => { if (confirm('Delete this project?')) void deleteProject(project.id); }} className="inline-flex items-center gap-1.5 text-sm text-danger hover:text-danger/80"><Trash2 size={14} /> Delete</button>
+              <button type="button" onClick={() => toastDelete([project.id])} className="inline-flex items-center gap-1.5 text-sm text-danger hover:text-danger/80"><Trash2 size={14} /> Delete</button>
               <button type="button" onClick={closeDrawer} className="px-4 py-2 rounded-lg bg-surface-elevated border border-border text-sm text-text">Close</button>
             </div>
           </motion.aside>

@@ -8,13 +8,35 @@ import { StatusCards } from '@/src/components/StatusCards';
 import { ProjectList } from '@/src/components/ProjectList';
 import { ProjectDrawer } from '@/src/components/ProjectDrawer';
 import { CommandPalette } from '@/src/components/CommandPalette';
+import { ToastHost } from '@/src/components/ToastHost';
 import { useProjectStore } from '@/src/store/useProjectStore';
 import { WorkspaceSaveNotice } from '@/src/components/SaveStatus';
 import { IntelligenceBand } from '@/src/components/IntelligenceBand';
 import { EmptyWorkspace } from '@/src/components/EmptyWorkspace';
+import type { Project, Workspace, WorkspaceUptime } from '@/src/types';
 
-export function DashboardClient({ userId }: { userId: string }) {
+export type DashboardSnapshot = {
+  userId: string;
+  workspaceId: string | null;
+  workspaces: Workspace[];
+  projects: Project[];
+  uptime: WorkspaceUptime;
+};
+
+export function DashboardClient({
+  userId,
+  initial,
+}: {
+  userId: string;
+  initial: DashboardSnapshot | null;
+}) {
   const { isLoaded, isSignedIn } = useAuth();
+  useState(() => {
+    if (initial && useProjectStore.getState().loadStatus === 'idle') {
+      useProjectStore.getState().hydrateDashboard(initial);
+    }
+    return true;
+  });
   const loadProjects = useProjectStore((s) => s.loadProjects);
   const loadWorkspaces = useProjectStore((s) => s.loadWorkspaces);
   const loadStatus = useProjectStore((s) => s.loadStatus);
@@ -35,13 +57,9 @@ export function DashboardClient({ userId }: { userId: string }) {
   }, []);
 
   useEffect(() => {
-    // Wait until Clerk has settled so DraftSession cannot treat the handshake
-    // gap as a sign-out and discard the list response, and so /api/projects
-    // is not fetched before the session cookie is usable. Hard refresh can
-    // report isLoaded before isSignedIn; firing then used to 401/503 the list.
     if (!isLoaded || !isSignedIn) return;
-    void loadProjects(userId);
     void loadWorkspaces();
+    void loadProjects(userId);
   }, [isLoaded, isSignedIn, loadProjects, loadWorkspaces, userId]);
 
   useEffect(() => {
@@ -65,6 +83,9 @@ export function DashboardClient({ userId }: { userId: string }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [navOpen]);
 
+  const ready = loadStatus === 'ready';
+  const failed = loadStatus === 'error' && !ready;
+
   return (
     <div className="flex h-full bg-background text-text overflow-hidden">
       <Sidebar mobileOpen={navOpen} onClose={() => setNavOpen(false)} />
@@ -72,11 +93,7 @@ export function DashboardClient({ userId }: { userId: string }) {
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <WorkspaceSaveNotice />
 
-        {loadStatus === 'loading' || loadStatus === 'idle' ? (
-          <div className="flex-1 flex items-center justify-center text-sm text-text-dim">
-            Loading your workspace…
-          </div>
-        ) : loadStatus === 'error' ? (
+        {failed ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 px-4 text-center">
             <p className="text-sm text-danger font-medium">Could not load projects</p>
             <p className="text-xs text-text-dim max-w-md">{loadError || 'Please try again in a moment.'}</p>
@@ -88,11 +105,16 @@ export function DashboardClient({ userId }: { userId: string }) {
               Retry
             </button>
           </div>
+        ) : !ready ? (
+          <div className="flex-1 flex items-center justify-center text-sm text-text-dim">
+            Loading your workspace…
+          </div>
         ) : (
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-5 pb-8">
               <Header
                 onMenu={() => setNavOpen(true)}
+                onPalette={() => setPaletteOpen(true)}
                 account={
                   <UserButton
                     afterSignOutUrl="/"
@@ -106,7 +128,7 @@ export function DashboardClient({ userId }: { userId: string }) {
                 <>
                   <IntelligenceBand />
                   <StatusCards />
-                  <ProjectList />
+                  <ProjectList initialUptime={initial?.uptime ?? null} />
                 </>
               )}
             </div>
@@ -116,6 +138,7 @@ export function DashboardClient({ userId }: { userId: string }) {
 
       <ProjectDrawer />
       <CommandPalette isOpen={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <ToastHost />
     </div>
   );
 }

@@ -2,9 +2,17 @@ import { SignIn } from '@clerk/nextjs';
 import { AuthFrame } from '@/src/components/AuthFrame';
 import { AuthUnavailable } from '@/src/components/AuthUnavailable';
 import { isClerkConfigured } from '@/src/lib/auth';
+import { safeAuthRedirect } from '@/src/lib/sign-in-redirect';
 
-export default function SignInPage() {
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ redirect_url?: string | string[] }>;
+}) {
   if (!isClerkConfigured()) return <AuthUnavailable />;
+
+  const params = await searchParams;
+  const after = safeAuthRedirect(params.redirect_url);
 
   return (
     <AuthFrame title="Sign in" subtitle="GitHub or the email already on this account.">
@@ -12,7 +20,8 @@ export default function SignInPage() {
         routing="path"
         path="/sign-in"
         signUpUrl="/sign-up"
-        forceRedirectUrl="/dashboard"
+        forceRedirectUrl={after}
+        fallbackRedirectUrl={after}
         appearance={{
           elements: {
             rootBox: 'w-full',

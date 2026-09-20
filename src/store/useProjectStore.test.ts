@@ -655,3 +655,95 @@ describe('workspaces', () => {
     assert.equal(state().drafts.ours, undefined, 'a team draft must not appear in the personal workspace');
   });
 });
+
+describe('checklist next action', () => {
+  it('toggles a checklist line through setNextAction', async () => {
+    await loadWith([serverProject({ nextAction: '- [ ] write tests' })]);
+    handler = (call) =>
+      json(200, {
+        project: serverProject({ ...(call.body as Partial<Project>), version: 2 }),
+      });
+
+    const { toggleChecklistLine } = await import('../lib/rich-text');
+    state().setNextAction('p1', toggleChecklistLine(shown('p1').nextAction, 0));
+    await settle();
+
+    assert.equal(shown('p1').nextAction, '- [x] write tests');
+    assert.equal((patches()[0].body as { nextAction: string }).nextAction, '- [x] write tests');
+  });
+});
+
+describe('delete undo', () => {
+  it('restores a queued delete without sending DELETE', async () => {
+    await loadWith([serverProject()]);
+    handler = () => json(200, { ok: true });
+
+    const queued = state().queueDelete(['p1']);
+    assert.deepEqual(queued, ['p1']);
+    assert.equal(state().projects.length, 0, 'the row is hidden immediately');
+    assert.ok(state().pendingDeletes.p1);
+
+    state().undoDelete(queued);
+    assert.equal(state().projects.length, 1);
+    assert.equal(shown('p1').name, 'Ship the thing');
+    assert.equal(state().pendingDeletes.p1, undefined);
+    assert.equal(calls.filter((c) => c.method === 'DELETE').length, 0);
+  });
+
+  it('commits a queued delete through the existing delete pipeline', async () => {
+    await loadWith([serverProject({ version: 4 })]);
+    handler = () => json(200, { ok: true });
+
+    const queued = state().queueDelete(['p1']);
+    await state().commitDelete(queued);
+
+    const remove = calls.find((c) => c.method === 'DELETE');
+    assert.ok(remove);
+    assert.equal((remove!.body as { version: number }).version, 4);
+    assert.equal(state().projects.length, 0);
+    assert.equal(state().pendingDeletes.p1, undefined);
+  });
+
+  it('does not queue a project that still has a draft', async () => {
+    await loadWith([serverProject()]);
+    handler = () => {
+      throw new Error('offline');
+    };
+    state().setProgress('p1', 40);
+    await settle();
+    calls = [];
+
+    const queued = state().queueDelete(['p1']);
+    assert.deepEqual(queued, []);
+    assert.equal(state().projects.length, 1);
+    assert.equal(state().operationCode, 'CLIENT');
+    assert.equal(calls.filter((c) => c.method === 'DELETE').length, 0);
+  });
+});
+
+describe('dashboard first paint', () => {
+  it('hydrates without a loading flash and refreshes without dropping the list', async () => {
+    const seeded = serverProject({ name: 'Already here' });
+    state().hydrateDashboard({
+      userId: USER,
+      workspaceId: null,
+      workspaces: [{ workspaceId: USER, name: 'Personal', personal: true, ownerUserId: USER, role: 'owner' }],
+      projects: [seeded],
+    });
+    assert.equal(state().loadStatus, 'ready');
+    assert.equal(state().projects[0].name, 'Already here');
+
+    handler = () => json(200, { projects: [serverProject({ name: 'From server' })] });
+    await state().loadProjects(USER);
+    assert.equal(state().loadStatus, 'ready');
+    assert.equal(state().projects[0].name, 'From server');
+    assert.equal(state().projects.length, 1);
+  });
+
+  it('requestAdd is a one-shot flag for the header compose box', () => {
+    state().requestAdd();
+    assert.equal(state().addRequested, true);
+    state().clearAddRequest();
+    assert.equal(state().addRequested, false);
+  });
+});
