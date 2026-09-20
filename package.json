@@ -16,6 +16,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "test": "tsx --test \"src/lib/**/*.test.ts\" \"src/store/*.test.ts\" \"src/db/connection-string.test.ts\" \"src/db/map.test.ts\" \"src/db/connect-error.test.ts\" \"src/db/monitor-timestamps.test.ts\"",
+    "probe:deep-health": "node scripts/probe-deep-health.mjs",
     "test:db": "node scripts/test-db.mjs",
     "typecheck:tests": "tsc -p tsconfig.test.json --noEmit",
     "check:production-auth": "node scripts/check-production-auth.mjs",

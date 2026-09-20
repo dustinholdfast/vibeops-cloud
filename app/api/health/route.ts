@@ -5,6 +5,7 @@ import { hyperdriveConnectionString, withDb } from '@/src/db';
 import { projects } from '@/src/db/schema';
 import { dbProjectToDomain } from '@/src/db/map';
 import { env } from '@/src/lib/env';
+import { DEEP_HEALTH_TIMEOUT_MS, withTimeout } from '@/src/lib/timeout';
 
 /**
  * Cheap liveness by default. `?deep=1` also probes monitor storage — useful
@@ -25,7 +26,11 @@ export async function GET(req: Request) {
   let monitorsError: string | undefined;
   if (deep && env('DATABASE_URL')) {
     try {
-      monitorsReady = await monitorStorageReady();
+      monitorsReady = await withTimeout(
+        () => monitorStorageReady(),
+        DEEP_HEALTH_TIMEOUT_MS,
+        'monitorStorageReady'
+      );
     } catch (error) {
       monitorsReady = 'unreachable';
       const message = error instanceof Error ? error.message : String(error);
@@ -51,12 +56,17 @@ export async function GET(req: Request) {
       projectsError = 'workspaceId query param required';
     } else {
       try {
-        const rows = await withDb((db) =>
-          db
-            .select()
-            .from(projects)
-            .where(eq(projects.workspaceId, workspaceId))
-            .orderBy(desc(projects.lastTouched))
+        const rows = await withTimeout(
+          () =>
+            withDb((db) =>
+              db
+                .select()
+                .from(projects)
+                .where(eq(projects.workspaceId, workspaceId))
+                .orderBy(desc(projects.lastTouched))
+            ),
+          DEEP_HEALTH_TIMEOUT_MS,
+          'projectsProbe'
         );
         // Same mapping `/api/projects` runs — this is what previously 503'd.
         const mapped = rows.map(dbProjectToDomain);

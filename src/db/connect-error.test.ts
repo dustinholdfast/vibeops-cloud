@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  dbCacheKind,
   isConnectError,
   isMissingRelationError,
   shouldResetIsolateOnStorageError,
@@ -63,5 +64,15 @@ describe('storage-ready isolate reset policy', () => {
     assert.equal(shouldResetIsolateOnStorageError(new Error('password authentication failed')), false);
     assert.equal(shouldResetIsolateOnStorageError({ code: '53300', message: 'too many connections' }), false);
     assert.equal(shouldResetIsolateOnStorageError(new Error('duplicate key value violates unique constraint')), false);
+  });
+});
+
+describe('dbCacheKind', () => {
+  it('is request-scoped on Workers so sockets cannot cross I/O contexts', () => {
+    assert.equal(dbCacheKind(true), 'request');
+  });
+
+  it('is process-scoped on Node so tests share one client', () => {
+    assert.equal(dbCacheKind(false), 'process');
   });
 });

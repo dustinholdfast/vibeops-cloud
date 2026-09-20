@@ -14,14 +14,23 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
  * unconfigured. Reading it on first call moves the lookup inside a request,
  * where the value exists.
  *
- * Cached for the isolate (Workers) or process (Node). Do not call
- * `client.end()` from a request — that races siblings and cancels them with
- * Workers 1101. Do not drop the cache from `after()` after every request
- * either: hard-refresh fan-out (projects + workspaces + billing) then hits a
- * new pool while the previous sockets are still draining, and GET
- * `/api/projects` hangs (Worker status 0) or throws a socket read that
- * `projectErrorResponse` used to hide as a generic 503. Reset only when a
- * query actually loses the socket ({@link withDb}).
+ * On Node the handle is cached for the process. On Workers it is cached on
+ * the OpenNext request context (ALS `.run()`, not `enterWith` — workerd
+ * does not implement `enterWith`).
+ *
+ * Do not cache postgres.js at isolate scope. Sockets are bound to the
+ * request that created them; the next request on the same isolate that
+ * reuses them hits "Cannot perform I/O on behalf of a different request"
+ * or a promise that can never resolve. workerd then hang-cancels with
+ * 1101. That is the leftover after #35/#37: sequential
+ * `GET /api/health?deep=1` alternated 200 / 1101 because the first query
+ * succeeded and poisoned the next. Hyperdrive is the real pool — a new
+ * client per request is what their postgres.js docs recommend.
+ *
+ * Do not `client.end()` from a request handler. Ending races in-flight
+ * siblings and caused 1101s when the uptime cron awaited closeDb().
+ * Reset only this request's handle when a query actually loses the
+ * socket ({@link withDb}).
  */
 
 /** True inside workerd. Node and the build have no `navigator`. */
@@ -30,9 +39,29 @@ const onWorkers =
 
 type Client = ReturnType<typeof postgres>;
 type Database = ReturnType<typeof drizzle>;
+type RequestDb = { client: Client; database: Database };
 
+/** Process-wide handle on Node (tests, scripts, `next start`). */
 let client: Client | null = null;
 let database: Database | null = null;
+
+/**
+ * Stashed on OpenNext's per-request Cloudflare context object.
+ * workerd implements ALS `.run()` (that is how `getCloudflareContext` works);
+ * it does not implement `enterWith`.
+ */
+const REQUEST_DB = Symbol('noxen-request-db');
+
+type RequestContext = { [REQUEST_DB]?: RequestDb };
+
+function workerRequestContext(): RequestContext | null {
+  if (!onWorkers) return null;
+  try {
+    return getCloudflareContext() as RequestContext;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Adjusts a connection string for what this driver and runtime actually
@@ -109,18 +138,14 @@ function resolveConnectionString(): string | undefined {
   return env('DATABASE_URL');
 }
 
-export function requireDb(): Database {
-  if (database) {
-    return database;
-  }
-
+function openDatabase(): RequestDb {
   const raw = resolveConnectionString();
   if (!raw) {
     throw new Error('DATABASE_URL is not configured');
   }
   const connectionString = normaliseConnectionString(raw);
 
-  client = postgres(connectionString, {
+  const opened = postgres(connectionString, {
     /**
      * Required by every transaction-mode pooler — Neon's pooled endpoint,
      * PgBouncer, Hyperdrive. Prepared statements belong to a session, and a
@@ -136,26 +161,55 @@ export function requireDb(): Database {
     ...(onWorkers
       ? {
           /**
-           * Small pool per isolate. Dashboard fan-out needs more than one
-           * concurrent query; Neon’s pooler still does the real pooling.
+           * Per-request pool. Dashboard fan-out needs more than one concurrent
+           * query; Hyperdrive still does the real origin pooling. Workers
+           * allow at most ~6 concurrent external connections.
            */
           max: 5,
           /** Skips the pg_catalog round trip on connect. */
           fetch_types: false,
-          idle_timeout: 20,
+          idle_timeout: 5,
           /**
-           * Must finish (and leave time for {@link withDb} to retry) inside the
-           * dashboard client's 15s fetch abort. Hyperdrive + Supabase is always
-           * on; the old 20s budget was for Neon scale-to-zero and let the first
-           * attempt outlive the browser, so hard refresh saw a hung
-           * `/api/projects` instead of a retry.
+           * Must finish (and leave time for {@link withDb} to retry) inside
+           * the dashboard client's 15s fetch abort, and inside the 6s
+           * `?deep=1` budget. A connect with no timeout is one way a
+           * request never returns a Response.
            */
-          connect_timeout: 8,
+          connect_timeout: 5,
         }
       : {}),
   });
 
-  database = drizzle(client, { schema });
+  return { client: opened, database: drizzle(opened, { schema }) };
+}
+
+/**
+ * How the current runtime stores the DB handle.
+ *
+ * `request` on Workers so sockets never cross I/O contexts.
+ * `process` on Node so tests and scripts share one client.
+ */
+export function dbCacheKind(workers = onWorkers): 'request' | 'process' {
+  return workers ? 'request' : 'process';
+}
+
+export function requireDb(): Database {
+  const ctx = workerRequestContext();
+  if (ctx) {
+    const existing = ctx[REQUEST_DB];
+    if (existing) return existing.database;
+    const opened = openDatabase();
+    ctx[REQUEST_DB] = opened;
+    return opened.database;
+  }
+
+  if (database) {
+    return database;
+  }
+
+  const opened = openDatabase();
+  client = opened.client;
+  database = opened.database;
   return database;
 }
 
@@ -170,6 +224,8 @@ export function requireDb(): Database {
  * callers holding a corpse for the rest of the isolate's life.
  */
 export async function closeDb() {
+  const ctx = workerRequestContext();
+  if (ctx) ctx[REQUEST_DB] = undefined;
   const old = client;
   client = null;
   database = null;
@@ -179,12 +235,17 @@ export async function closeDb() {
 /**
  * Drop the cached handle without closing the socket.
  *
- * Isolates reuse the client across requests. If Neon suspends or a TCP path
- * dies, clearing the cache lets the following request open a fresh connection.
- * Do not `end()` here: that races in-flight holders and caused Workers 1101s
- * when the uptime cron awaited closeDb().
+ * On Workers this is the current request only. A connect error must not
+ * tear down a sibling request's client. Do not `end()` here: that races
+ * in-flight holders and caused Workers 1101s when the uptime cron awaited
+ * closeDb().
  */
 export function resetDb() {
+  const ctx = workerRequestContext();
+  if (ctx) {
+    ctx[REQUEST_DB] = undefined;
+    return;
+  }
   client = null;
   database = null;
 }
