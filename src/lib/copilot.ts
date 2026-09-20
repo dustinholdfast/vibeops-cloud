@@ -3,7 +3,7 @@ import { MAX_ACTIVITY_ENTRIES } from './project-validation';
 import { generateId } from './utils';
 
 export const COPILOT_AUTHOR = 'Noxen';
-export const COPILOT_MODEL = 'gemini-2.5-flash';
+export const COPILOT_MODEL = 'gemini-3.6-flash';
 export const COPILOT_KEY_ENV = 'GEMINI_API_KEY';
 const SNAPSHOT_LIMIT = 50;
 

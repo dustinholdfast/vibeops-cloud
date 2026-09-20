@@ -64,7 +64,7 @@
    *   EMAIL_FROM
    *   CRON_SECRET
    *   ADMIN_USER_IDS / ADMIN_EMAILS
-   *   GEMINI_API_KEY                      workspace copilot (Gemini 2.5 Flash)
+   *   GEMINI_API_KEY                      workspace copilot (Gemini 3.6 Flash)
    *
    * NEXT_PUBLIC_* values are inlined by Next at build time, so they must be
    * present in the build environment as well as set as secrets — a secret
