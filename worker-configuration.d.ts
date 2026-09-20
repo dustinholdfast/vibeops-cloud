@@ -4,6 +4,7 @@
 interface __BaseEnv_CloudflareEnv {
 	HYPERDRIVE: Hyperdrive;
 	ASSETS: Fetcher;
+	SELF?: Fetcher;
 	NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: string;
 	NEXT_PUBLIC_APP_URL: string;
 	NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: string;

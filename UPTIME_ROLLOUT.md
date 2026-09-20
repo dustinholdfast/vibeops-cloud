@@ -167,6 +167,14 @@ leaves the weekly digest alone. Both switches live in the workspace menu.
 **Retention.** Check rows older than 35 days are pruned on each `send=1` run —
 long enough for the 30-day figure.
 
+**This Worker cannot fetch its own `workers.dev` URL.** Cloudflare short-circuits
+that hop (silent HTTP 404 or error 1042 / 1019) even when laptop curl returns
+200. `probe()` detects the incoming request host / `NEXT_PUBLIC_APP_URL` and
+checks this deployment via the `SELF` service binding, falling back to an
+in-process `/api/health`. Same-account *other* `*.workers.dev` hosts go through
+public `fetch` (`global_fetch_strictly_public` in `wrangler.jsonc`). Check now
+labels a leftover Cloudflare loop as “blocked”, not “the site is down”.
+
 **Check now.** The drawer has a manual trigger that probes immediately and
 answers inline. It runs the same pipeline as the sweep — probe, state machine,
 record, alert on a transition — because a person clicking a button and the cron
@@ -234,6 +242,8 @@ New pure-logic suites, no network or database needed:
 | File | Covers |
 | --- | --- |
 | `src/lib/uptime/target.test.ts` | every blocked range, and that neighbours of private ranges are not over-blocked |
+| `src/lib/uptime/self-host.test.ts` | own-host / same-account workers.dev detection, 1042 remap |
+| `src/lib/uptime/probe.test.ts` | self-fetch uses the binding/health path, public 1042 is labelled |
 | `src/lib/uptime/status.test.ts` | thresholds, one-alert-per-outage, recovery, first-check cases |
 | `src/lib/uptime/history.test.ts` | uptime %, bucketing, current streak |
 | `src/lib/email/render-alert.test.ts` | subjects, durations, escaping, unsubscribe link |
@@ -252,6 +262,8 @@ needs a deployment with `CRON_SECRET` set.
 | `src/lib/uptime/status.ts` | up/down state machine and alert rule |
 | `src/lib/uptime/history.ts` | uptime %, buckets, streaks |
 | `src/lib/uptime/probe.ts` | the one impure part: the HTTP check |
+| `src/lib/uptime/self-host.ts` | own-host / Cloudflare loop detection |
+| `src/lib/uptime/probe-context.ts` | SELF binding + in-process `/api/health` for this Worker |
 | `src/db/monitor-service.ts` | storage, tenant scoping, recipients, pruning |
 | `src/lib/email/render-alert.ts` | down and recovery emails |
 | `app/api/projects/[id]/monitor/route.ts` | GET / PUT / DELETE a monitor |

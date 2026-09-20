@@ -26,6 +26,18 @@
   },
 
   /**
+   * Loopback so uptime can probe this Worker without going out through
+   * workers.dev and back. Even with global_fetch_strictly_public, a Worker
+   * fetching its own hostname is a loop Cloudflare may 404 / 1019.
+   */
+  "services": [
+    {
+      "binding": "SELF",
+      "service": "vibeops-cloud"
+    }
+  ],
+
+  /**
    * Configuration lives in secrets, not here, so nothing environment-specific
    * is committed. Set each with `npx wrangler secret put <NAME>`:
    *
