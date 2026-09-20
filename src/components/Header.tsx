@@ -148,9 +148,9 @@ export function Header({
           <button
             type="button"
             onClick={onCopilot}
-            title="Workspace copilot (⌘J)"
+            title="Nox (⌘J)"
             className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-surface border border-border text-text-muted hover:text-text"
-            aria-label="Open workspace copilot"
+            aria-label="Open Nox"
           >
             <Sparkles size={16} />
           </button>

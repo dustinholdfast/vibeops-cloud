@@ -2,7 +2,7 @@ import type { Health, Priority, Project, Stage } from '../types';
 import { MAX_ACTIVITY_ENTRIES } from './project-validation';
 import { generateId } from './utils';
 
-export const COPILOT_AUTHOR = 'Noxen';
+export const COPILOT_AUTHOR = 'Nox';
 export const COPILOT_MODEL = 'gemini-3.6-flash';
 export const COPILOT_KEY_ENV = 'GEMINI_API_KEY';
 const SNAPSHOT_LIMIT = 50;
@@ -126,7 +126,7 @@ export function copilotClientError(error: unknown): string {
 
 export function copilotSystemPrompt(workspaceName: string, projects: CopilotProject[]): string {
   return [
-    'You are the Noxen Cloud copilot for this workspace.',
+    'You are Nox, the Noxen Cloud copilot for this workspace.',
     `Workspace: ${workspaceName}.`,
     'Answer from the workspace snapshot. Use tools to create or edit projects; do not claim you changed something unless a tool succeeded.',
     'Never delete projects. Never invent ids. Match an existing project by id or exact name before updating.',

@@ -126,7 +126,7 @@ export function copilotTools(scope: Scope) {
             version: current.version,
             mutationId: generateId(),
             ...patch,
-            activity: withCopilotActivity(current, `Copilot: ${summary}`, type),
+            activity: withCopilotActivity(current, `Nox: ${summary}`, type),
           });
           return { ok: true as const, project: updated.project, summary: `${current.name}: ${summary}` };
         } catch (error) {

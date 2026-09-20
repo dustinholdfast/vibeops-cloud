@@ -57,6 +57,7 @@ describe('copilot snapshot', () => {
 
   it('grounds the system prompt in the snapshot JSON', () => {
     const prompt = copilotSystemPrompt('Personal', compactWorkspace([project()]));
+    assert.match(prompt, /You are Nox/);
     assert.match(prompt, /Noxen Cloud copilot/);
     assert.match(prompt, /Holdfast CRM/);
     assert.doesNotMatch(prompt, /a1/);

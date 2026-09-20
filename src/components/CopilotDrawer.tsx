@@ -120,7 +120,7 @@ export function CopilotDrawer({ open, onClose }: { open: boolean; onClose: () =>
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-text-dim">Workspace copilot</p>
                 <h2 id="copilot-title" className="text-lg font-semibold text-text truncate flex items-center gap-2">
                   <Sparkles size={16} className="text-purple-light" />
-                  Noxen
+                  Nox
                 </h2>
                 <p className="text-xs text-text-dim mt-1">Gemini 3.6 Flash · can create and edit projects</p>
               </div>
@@ -128,7 +128,7 @@ export function CopilotDrawer({ open, onClose }: { open: boolean; onClose: () =>
                 type="button"
                 onClick={onClose}
                 className="p-1.5 rounded-lg text-text-dim hover:text-text hover:bg-surface-elevated"
-                aria-label="Close copilot"
+                aria-label="Close Nox"
               >
                 <X size={18} />
               </button>
@@ -187,7 +187,7 @@ export function CopilotDrawer({ open, onClose }: { open: boolean; onClose: () =>
                   }
                 }}
                 rows={3}
-                placeholder="Tell Noxen what to change…"
+                placeholder="Tell Nox what to change…"
                 className="w-full resize-none rounded-xl bg-surface-elevated border border-border px-3 py-2 text-sm text-text placeholder:text-text-dim focus:outline-none focus:border-purple/50"
               />
               <div className="flex items-center justify-between gap-2">

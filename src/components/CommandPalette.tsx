@@ -67,7 +67,7 @@ export function CommandPalette({
         ? [
             {
               id: 'act-copilot',
-              label: 'Open workspace copilot',
+              label: 'Open Nox',
               hint: '⌘J',
               action: () => {
                 onCopilot();
