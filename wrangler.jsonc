@@ -21,9 +21,10 @@
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
 
   /**
-   * Custom domains. workers.dev stays up as rollback. Do not set
-   * workers_dev false until Clerk production on this host is verified.
+   * Custom domains. workers.dev stays up as rollback. Wrangler disables it
+   * whenever `routes` exist unless this is explicit.
    */
+  "workers_dev": true,
   "routes": [
     { "pattern": "noxencloud.com", "custom_domain": true },
     { "pattern": "www.noxencloud.com", "custom_domain": true }
