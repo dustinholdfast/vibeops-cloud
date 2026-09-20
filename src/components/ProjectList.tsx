@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback, useEffect, useState } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
 import {
   formatLastTouched,
@@ -10,9 +11,14 @@ import {
   HEALTH_OPTIONS,
 } from '../lib/utils';
 import { isRotting, quietLabel } from '../lib/rotting';
-import type { Priority, Stage, Health, DeadlineState } from '../types';
+import { apiListUptime } from '../lib/api';
+import type { Priority, Stage, Health, DeadlineState, UptimeRow } from '../types';
 import { ExternalLink, Github } from 'lucide-react';
 import { SaveStatusChip } from './SaveStatus';
+import { UptimeChip } from './UptimeChip';
+
+/** Kept in step with the /uptime page — checks themselves run every few minutes. */
+const UPTIME_REFRESH_MS = 60_000;
 
 const stageColor: Record<Stage, string> = {
   Exploring: 'bg-blue',
@@ -48,12 +54,36 @@ export function ProjectList() {
     healthFilter,
     deadlineFilter,
     search,
+    workspaceId,
     openDrawer,
     setPriority,
     setHealth,
     setHealthFilter,
     setDeadlineFilter,
   } = useProjectStore();
+
+  const [uptimeByProject, setUptimeByProject] = useState<Map<string, UptimeRow>>(
+    () => new Map()
+  );
+
+  const loadUptime = useCallback(async () => {
+    try {
+      const data = await apiListUptime();
+      if (!data.available) {
+        setUptimeByProject(new Map());
+        return;
+      }
+      setUptimeByProject(new Map(data.monitored.map((row) => [row.projectId, row])));
+    } catch {
+      // The list still works without chips; a failed fetch must not blank the page.
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadUptime();
+    const id = window.setInterval(() => void loadUptime(), UPTIME_REFRESH_MS);
+    return () => window.clearInterval(id);
+  }, [loadUptime, workspaceId]);
 
   const filtered = projects
     .filter((p) => (filter === 'All' ? true : p.stage === filter))
@@ -232,6 +262,7 @@ export function ProjectList() {
                     <SaveStatusChip id={project.id} />
                   </div>
                   <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <UptimeChip row={uptimeByProject.get(project.id)} />
                     {project.liveUrl && (
                       <a
                         href={project.liveUrl}
