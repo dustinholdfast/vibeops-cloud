@@ -1,5 +1,5 @@
 import { and, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm';
-import { requireDb, resetDb, withDb } from './index';
+import { isMissingRelationError, requireDb, withDb } from './index';
 import { optionalTimestampToIso, timestampToDate, timestampToIso, timestampToMs } from './map';
 import { projectChecks, projectMonitors, projects } from './schema';
 import { ProjectError } from '../lib/project-validation';
@@ -98,16 +98,20 @@ export async function monitorStorageReady(): Promise<boolean> {
     return true;
   } catch (error) {
     // 42P01, undefined_table: the migration genuinely has not run.
-    if ((error as { code?: unknown })?.code === '42P01') return false;
+    if (isMissingRelationError(error)) return false;
 
     /**
      * Anything else is not a missing migration and must not be reported as
      * one. An unreachable database, a rejected password or an exhausted
      * connection limit would otherwise surface as "monitoring is not set up",
      * sending whoever is debugging to look at schema instead of the network.
-     * On Workers that is the more likely failure of the two.
+     *
+     * Do not resetDb() here. withDb already retries connect errors and drops
+     * the handle only then. Resetting on every non-42P01 throw tears down the
+     * isolate Hyperdrive pool while siblings (dashboard uptime card, Check
+     * now, projects) are still reading — the leftover that 1101'd
+     * GET /api/health?deep=1 after #35.
      */
-    resetDb();
     throw error;
   }
 }
@@ -161,8 +165,8 @@ export async function getMonitorSnapshot(
   projectId: string,
   now: Date = new Date()
 ): Promise<MonitorSnapshot> {
+  return withDb(async (db) => {
   await requireProject(scope, projectId);
-  const db = requireDb();
 
   const [row] = await db
     .select()
@@ -208,6 +212,7 @@ export async function getMonitorSnapshot(
       error: r.error,
     })),
   };
+  });
 }
 
 /**
@@ -221,9 +226,9 @@ export async function saveMonitor(
   projectId: string,
   input: MonitorInput
 ): Promise<MonitorView> {
+  return withDb(async (db) => {
   requireWrite(scope);
   const project = await requireProject(scope, projectId);
-  const db = requireDb();
 
   const [existing] = await db
     .select()
@@ -314,6 +319,7 @@ export async function saveMonitor(
     .from(projectMonitors)
     .where(eq(projectMonitors.projectId, projectId));
   return toView(saved);
+  });
 }
 
 export async function deleteMonitor(
@@ -341,7 +347,8 @@ export async function deleteMonitor(
  * to do. That is what lets one endpoint serve every scheduler.
  */
 export async function dueMonitors(now: Date = new Date(), limit = 100): Promise<DueMonitor[]> {
-  const rows = await requireDb()
+  const rows = await withDb((db) =>
+    db
     .select({
       projectId: projectMonitors.projectId,
       workspaceId: projectMonitors.workspaceId,
@@ -381,7 +388,8 @@ export async function dueMonitors(now: Date = new Date(), limit = 100): Promise<
       )
     )
     .orderBy(projectMonitors.lastCheckedAt)
-    .limit(limit);
+    .limit(limit)
+  );
 
   return rows.map((row) => ({
     ...row,
@@ -425,38 +433,40 @@ export async function monitorForCheck(
   projectId: string,
   now: Date = new Date()
 ): Promise<DueMonitor> {
-  requireWrite(scope);
-  const project = await requireProject(scope, projectId);
+  return withDb(async (db) => {
+    requireWrite(scope);
+    const project = await requireProject(scope, projectId);
 
-  const [row] = await requireDb()
-    .select()
-    .from(projectMonitors)
-    .where(eq(projectMonitors.projectId, projectId));
+    const [row] = await db
+      .select()
+      .from(projectMonitors)
+      .where(eq(projectMonitors.projectId, projectId));
 
-  if (!row) {
-    throw new ProjectError(404, 'NOT_FOUND', 'This project is not being monitored yet.');
-  }
+    if (!row) {
+      throw new ProjectError(404, 'NOT_FOUND', 'This project is not being monitored yet.');
+    }
 
-  if (isWithinManualCheckCooldown(row.lastCheckedAt, now)) {
-    throw new ProjectError(
-      429,
-      'TOO_MANY_REQUESTS',
-      'Just checked. Give it a few seconds before checking again.'
-    );
-  }
+    if (isWithinManualCheckCooldown(row.lastCheckedAt, now)) {
+      throw new ProjectError(
+        429,
+        'TOO_MANY_REQUESTS',
+        'Just checked. Give it a few seconds before checking again.'
+      );
+    }
 
-  return {
-    projectId: row.projectId,
-    workspaceId: row.workspaceId,
-    projectName: project.name,
-    url: row.url,
-    timeoutMs: row.timeoutMs,
-    failureThreshold: row.failureThreshold,
-    status: row.status as MonitorStatus,
-    consecutiveFailures: row.consecutiveFailures,
-    consecutiveSuccesses: row.consecutiveSuccesses,
-    lastStatusChangeAt: row.lastStatusChangeAt ? timestampToDate(row.lastStatusChangeAt) : null,
-  };
+    return {
+      projectId: row.projectId,
+      workspaceId: row.workspaceId,
+      projectName: project.name,
+      url: row.url,
+      timeoutMs: row.timeoutMs,
+      failureThreshold: row.failureThreshold,
+      status: row.status as MonitorStatus,
+      consecutiveFailures: row.consecutiveFailures,
+      consecutiveSuccesses: row.consecutiveSuccesses,
+      lastStatusChangeAt: row.lastStatusChangeAt ? timestampToDate(row.lastStatusChangeAt) : null,
+    };
+  });
 }
 
 /** Writes one probe result and the state it produced. */
@@ -652,7 +662,7 @@ export async function listWorkspaceUptime(
   scope: Scope,
   now: Date = new Date()
 ): Promise<WorkspaceUptime> {
-  const db = requireDb();
+  return withDb(async (db) => {
   const workspaceId = scope.workspace.workspaceId;
 
   const monitors = await db
@@ -787,6 +797,7 @@ export async function listWorkspaceUptime(
       };
     }),
   };
+  });
 }
 
 /** Statuses for a set of projects, for the dashboard list. */
@@ -796,7 +807,8 @@ export async function monitorStatuses(
 ): Promise<Record<string, { status: MonitorStatus; enabled: boolean }>> {
   if (projectIds.length === 0) return {};
 
-  const rows = await requireDb()
+  const rows = await withDb((db) =>
+    db
     .select({
       projectId: projectMonitors.projectId,
       status: projectMonitors.status,
@@ -808,7 +820,8 @@ export async function monitorStatuses(
         eq(projectMonitors.workspaceId, workspaceId),
         inArray(projectMonitors.projectId, projectIds)
       )
-    );
+    )
+  );
 
   return Object.fromEntries(
     rows.map((row) => [

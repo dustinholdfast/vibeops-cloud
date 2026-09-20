@@ -1,6 +1,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { isConnectError } from './index';
+import {
+  isConnectError,
+  isMissingRelationError,
+  shouldResetIsolateOnStorageError,
+} from './index';
 
 describe('isConnectError', () => {
   it('matches the postgres.js timeout the live Worker currently logs', () => {
@@ -37,5 +41,27 @@ describe('isConnectError', () => {
   it('does not retry application errors', () => {
     assert.equal(isConnectError(new Error('duplicate key value violates unique constraint')), false);
     assert.equal(isConnectError({ status: 409, code: 'CONFLICT' }), false);
+  });
+});
+
+describe('storage-ready isolate reset policy', () => {
+  it('treats 42P01 as a missing migration, not a dead socket', () => {
+    const missing = { code: '42P01', message: 'relation "project_monitors" does not exist' };
+    assert.equal(isMissingRelationError(missing), true);
+    assert.equal(isConnectError(missing), false);
+    assert.equal(shouldResetIsolateOnStorageError(missing), false);
+  });
+
+  it('resets only on a true connect/socket failure', () => {
+    assert.equal(shouldResetIsolateOnStorageError(new Error('write CONNECT_TIMEOUT host:5432')), true);
+    assert.equal(shouldResetIsolateOnStorageError({ code: 'CONNECTION_ENDED' }), true);
+  });
+
+  it('does not reset the isolate pool on an ordinary query error', () => {
+    // This is the leftover that 1101'd siblings: monitorStorageReady used to
+    // call resetDb() before rethrowing every non-42P01 error.
+    assert.equal(shouldResetIsolateOnStorageError(new Error('password authentication failed')), false);
+    assert.equal(shouldResetIsolateOnStorageError({ code: '53300', message: 'too many connections' }), false);
+    assert.equal(shouldResetIsolateOnStorageError(new Error('duplicate key value violates unique constraint')), false);
   });
 });
