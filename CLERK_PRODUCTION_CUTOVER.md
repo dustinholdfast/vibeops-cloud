@@ -1,8 +1,11 @@
 # Clerk production cutover
 
-VibeOps Cloud currently uses a Clerk development instance at the Vercel preview
-domain. Clerk production requires a custom domain; `*.vercel.app` cannot be used
-as the production domain.
+Noxen Cloud currently uses a Clerk **development** instance on
+`https://vibeops-cloud.dustin-eef.workers.dev`. Clerk production requires a
+custom domain; `*.workers.dev` and `*.vercel.app` cannot be used as the
+production domain. Swapping `pk_live_` onto this host would orphan every
+workspace id. `/api/health` reports `environment: staging` and the blockers
+until that domain exists.
 
 ## Decisions required before cutover
 
@@ -58,9 +61,9 @@ migration, which is why the pre-flight checks below matter.
 
 ## Safe cutover order
 
-1. Add the custom domain to the current Vercel project and confirm HTTPS is
-   active. Keep the host unchanged for the authentication cutover so rollback
-   has only one moving part.
+1. Add the custom domain to the Cloudflare Worker (`vibeops-cloud`) and confirm
+   HTTPS is active. Keep `workers.dev` as rollback. Do not change Clerk keys
+   in the same step as DNS.
 2. Activate the Clerk production instance for that exact domain.
 3. Mirror the current sign-in methods, branding, session lifetime, and OAuth
    provider configuration in the production instance.

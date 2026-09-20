@@ -145,13 +145,8 @@ export const emailPreferences = pgTable(
     userId: text('user_id').primaryKey(),
     /** 1 = send the weekly digest. */
     weeklyDigest: integer('weekly_digest').notNull().default(1),
-    /**
-     * `uptime_alerts` also lives on this table but is deliberately absent here.
-     * Drizzle names every column in a `select()`, so listing it would make each
-     * existing digest query fail until the uptime migration is applied. It is
-     * read and written by raw SQL in `monitor-service.ts` instead, which keeps
-     * a late migration to "uptime alerts are off" rather than "email is broken".
-     */
+    /** 1 = email when a monitored project goes down or recovers. */
+    uptimeAlerts: integer('uptime_alerts').notNull().default(1),
     /** Bearer of this token may unsubscribe without signing in. */
     unsubscribeToken: text('unsubscribe_token').notNull(),
     /** Guards against a retried cron sending the same week twice. */
@@ -221,5 +216,27 @@ export type DbWorkspaceMember = typeof workspaceMembers.$inferSelect;
 export type DbWorkspaceInvite = typeof workspaceInvites.$inferSelect;
 export type DbEmailPreferences = typeof emailPreferences.$inferSelect;
 export type NewDbSubscription = typeof subscriptions.$inferInsert;
+/**
+ * Append-only activity. The JSONB `projects.activity` column is a fallback for
+ * databases that have not applied `scripts/project-events.sql` yet.
+ */
+export const projectEvents = pgTable(
+  'project_events',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('project_id').notNull(),
+    workspaceId: text('workspace_id').notNull(),
+    type: text('type').notNull(),
+    message: text('message').notNull(),
+    author: text('author'),
+    createdAt: pgTimestamptz('created_at').notNull(),
+  },
+  (t) => [
+    index('project_events_project_time_idx').on(t.projectId, t.createdAt),
+    index('project_events_workspace_idx').on(t.workspaceId),
+  ]
+);
+
 export type DbProjectMonitor = typeof projectMonitors.$inferSelect;
 export type DbProjectCheck = typeof projectChecks.$inferSelect;
+export type DbProjectEvent = typeof projectEvents.$inferSelect;

@@ -1,9 +1,13 @@
 # Vercel to Cloudflare Workers
 
-The application code runs on Workers. What remains is configuration and a
-staged cutover — neither of which can be done without production credentials.
+The application runs on Cloudflare Workers at
+`https://vibeops-cloud.dustin-eef.workers.dev` with Hyperdrive, a SELF loopback,
+and Clerk development keys. That host is **staging**. Clerk production still
+needs a custom domain — see `CLERK_PRODUCTION_CUTOVER.md`.
 
-Nothing has been deployed. Vercel is still serving production.
+`/api/health` reports `phase` from configured capabilities (database, Clerk,
+Stripe, cron), `environment: staging|production`, and `productionBlockers`.
+Do not treat a hardcoded `3` as product status; that field used to lie.
 
 ---
 
@@ -72,8 +76,8 @@ before any of this, and the advisory lock in `project-transaction.ts` is
 the unit a transaction-mode pooler pools. A session-scoped lock would have
 broken silently under pooling.
 
-Hyperdrive is an alternative and would cut connection latency further. It is
-not required for correctness and was deliberately left out of the first move.
+Hyperdrive is live (`HYPERDRIVE` in `wrangler.jsonc`). Do not deploy a Worker
+config that omits it.
 
 ---
 

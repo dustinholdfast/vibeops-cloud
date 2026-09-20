@@ -16,8 +16,10 @@ Local edition: [dustinholdfast/vibeops](https://github.com/dustinholdfast/vibeop
 | Free (5 projects) / Pro (unlimited) | ✅ |
 | Portfolio intelligence (daily brief, momentum, review) | ✅ |
 | Team workspaces (roles, invites) | ✅ |
-| Weekly digest email | ✅ |
+| Weekly digest email | ✅ (Cloudflare cron Worker, Monday 13:00 UTC) |
 | Uptime monitoring (per-project pings, history, alerts) | ✅ |
+| Staging on workers.dev | ✅ |
+| Clerk production (custom domain + pk_live_) | ⏳ blocked — see CLERK_PRODUCTION_CUTOVER.md |
 
 ---
 
@@ -26,7 +28,6 @@ Local edition: [dustinholdfast/vibeops](https://github.com/dustinholdfast/vibeop
 ```bash
 git clone https://github.com/dustinholdfast/vibeops-cloud.git
 cd vibeops-cloud
-git checkout phase-4-stripe   # until merged
 npm install
 cp .env.example .env.local
 ```

@@ -33,11 +33,31 @@ const MIGRATIONS = [
   'team-workspaces.sql',
   'email-preferences.sql',
   'uptime-monitors.sql',
+  'project-events.sql',
 ];
 
 const requested = process.argv.slice(2).filter((arg) => !arg.startsWith('-'));
 const files = requested.length ? requested : MIGRATIONS;
 
+function loadDatabaseUrlFromLocalEnv() {
+  if (process.env.DATABASE_URL) return;
+  const local = join(process.cwd(), '.env.local');
+  if (!existsSync(local)) return;
+  for (const line of readFileSync(local, 'utf8').split(/\r?\n/)) {
+    if (!line.startsWith('DATABASE_URL=')) continue;
+    let value = line.slice('DATABASE_URL='.length).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (value) process.env.DATABASE_URL = value;
+    break;
+  }
+}
+
+loadDatabaseUrlFromLocalEnv();
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
   console.error(

@@ -2,6 +2,13 @@ import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import { withDb } from './index';
 import { projectChecks, projectMonitors, projects, subscriptions } from './schema';
 import { dbProjectToDomain, domainToDbInsert } from './map';
+import {
+  attachActivities,
+  attachActivity,
+  dropEventsFor,
+  eventsTablePresent,
+  insertProjectEvents,
+} from './project-events';
 import { projectTransaction, type Transaction } from './project-transaction';
 import { resolvePlan, projectLimitFor } from '../lib/plans';
 import { can } from '../lib/workspace-roles';
@@ -76,7 +83,7 @@ export async function listProjects(scope: Scope) {
       .where(eq(projects.workspaceId, scope.workspace.workspaceId))
       .orderBy(desc(projects.lastTouched))
   );
-  return { projects: rows.map(dbProjectToDomain) };
+  return { projects: await attachActivities(rows.map(dbProjectToDomain)) };
 }
 
 export async function getProject(scope: Scope, projectId: string) {
@@ -88,7 +95,7 @@ export async function getProject(scope: Scope, projectId: string) {
       .where(and(eq(projects.id, id), eq(projects.workspaceId, scope.workspace.workspaceId)))
   );
   if (!row) throw new ProjectError(404, 'NOT_FOUND', 'This project is no longer available.');
-  return { project: dbProjectToDomain(row) };
+  return { project: await attachActivity(dbProjectToDomain(row)) };
 }
 
 /**
@@ -149,11 +156,19 @@ export async function createProject(scope: Scope, input: unknown) {
         },
       ],
     };
+    const created = domain.activity;
+    const useEvents = await eventsTablePresent(tx);
     const [row] = await tx
       .insert(projects)
-      .values(domainToDbInsert(workspaceId, scope.userId, domain))
+      .values(
+        domainToDbInsert(workspaceId, scope.userId, {
+          ...domain,
+          activity: useEvents ? [] : created,
+        })
+      )
       .returning();
-    return dbProjectToDomain(row);
+    if (useEvents) await insertProjectEvents(tx, id, workspaceId, created);
+    return { ...dbProjectToDomain(row), activity: created };
   });
 
   return { project };
@@ -181,6 +196,7 @@ export async function dropMonitoringFor(tx: Transaction, projectIds: string[]) {
     sql`select to_regclass('public.project_monitors') is not null as present`
   );
   const ready = (present as unknown as { present: boolean }[])[0]?.present;
+  await dropEventsFor(tx, projectIds);
   if (!ready) return;
 
   // Checks first: they are the child rows, and the order costs nothing.
@@ -251,12 +267,21 @@ export async function importProjects(scope: Scope, input: unknown) {
 
     await tx.delete(projects).where(eq(projects.workspaceId, workspaceId));
     if (list.length) {
+      const useEvents = await eventsTablePresent(tx);
       await tx.insert(projects).values(
         list.map((p) => ({
-          ...domainToDbInsert(workspaceId, scope.userId, p),
+          ...domainToDbInsert(workspaceId, scope.userId, {
+            ...p,
+            activity: useEvents ? [] : p.activity,
+          }),
           version: (previous.get(p.id) ?? 0) + 1,
         }))
       );
+      if (useEvents) {
+        for (const project of list) {
+          await insertProjectEvents(tx, project.id, workspaceId, project.activity);
+        }
+      }
     }
 
     const rows = await tx
@@ -304,10 +329,12 @@ export async function updateProject(scope: Scope, projectId: string, input: unkn
     // Date objects for drizzle timestamp columns. mapToDriverValue turns them
     // into ISO strings before postgres.js; a pre-stringified value throws.
     const now = new Date();
+    const { activity, ...rowFields } = fields;
+    const useEvents = await eventsTablePresent(tx);
     const [row] = await tx
       .update(projects)
       .set({
-        ...fields,
+        ...(useEvents ? rowFields : fields),
         updatedAt: now,
         lastTouched: now,
         version: existing.version + 1,
@@ -315,10 +342,11 @@ export async function updateProject(scope: Scope, projectId: string, input: unkn
       })
       .where(and(eq(projects.id, id), eq(projects.workspaceId, workspaceId)))
       .returning();
+    if (useEvents) await insertProjectEvents(tx, id, workspaceId, activity);
     return dbProjectToDomain(row);
   });
 
-  return { project };
+  return { project: await attachActivity(project) };
 }
 
 /** Idempotent: deleting an already-deleted project succeeds so a retry cannot fail. */

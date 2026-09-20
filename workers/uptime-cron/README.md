@@ -1,6 +1,9 @@
 # Uptime cron
 
-Calls `/api/cron/uptime?send=1` on the VibeOps deployment every five minutes.
+Calls Noxen Cloud cron routes on a schedule:
+
+- `*/5 * * * *` → `/api/cron/uptime?send=1`
+- `0 13 * * 1` → `/api/cron/weekly-digest?send=1` (Monday 13:00 UTC)
 
 ## Why this exists rather than a GitHub Action
 

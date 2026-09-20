@@ -26,8 +26,8 @@ returns `503 MIGRATION_REQUIRED` and no mail is sent. Still apply it first.
 | `RESEND_API_KEY` | Every send reports `skipped`. Nothing is delivered. |
 | `EMAIL_FROM` | Same as above. |
 
-Generate the secret with `openssl rand -hex 32`. On Vercel, add it as an
-environment variable — Vercel Cron sends it automatically as
+Generate the secret with `openssl rand -hex 32`. Put the same value on the
+`vibeops-cloud` Worker and on `workers/uptime-cron`. The scheduler sends
 `Authorization: Bearer $CRON_SECRET`.
 
 **3. Dry-run before you let it send.**
@@ -44,15 +44,22 @@ Read that output before going further.
 **4. Send to yourself.** Unsubscribe everyone else, or run against preview data,
 then call it with `?send=1` and read the actual email.
 
-**5. Enable the schedule.** `vercel.json` already declares it:
+**5. Enable the schedule.** The uptime cron Worker also fires the digest:
 
-```json
-{ "path": "/api/cron/weekly-digest?send=1", "schedule": "0 13 * * 1" }
+```
+0 13 * * 1   →  GET /api/cron/weekly-digest?send=1
 ```
 
-Mondays 13:00 UTC. Vercel Cron is UTC-only, so this is one fixed time for
-everyone — a reasonable morning in the Americas, afternoon/evening in Europe and
-Asia. Per-user send times need a stored timezone; see *Known limits*.
+Mondays 13:00 UTC. Prove it without waiting a week:
+
+```bash
+curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" \
+  https://vibeops-uptime-cron.<account>.workers.dev/run-digest
+```
+
+`vercel.json` still lists the old Vercel cron for rollback only. Do not treat
+that as the live scheduler. Per-user send times need a stored timezone; see
+*Known limits*.
 
 ## What gets sent, and to whom
 

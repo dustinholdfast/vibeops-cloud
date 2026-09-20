@@ -7,7 +7,7 @@
 
   // Cloudflare honours this. GitHub Actions does not — see the README.
   "triggers": {
-    "crons": ["*/5 * * * *"]
+    "crons": ["*/5 * * * *", "0 13 * * 1"]
   },
 
   // Staging origin is not sensitive; keeping it in vars means a fresh deploy

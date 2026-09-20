@@ -5,6 +5,7 @@ import { hyperdriveConnectionString, withDb } from '@/src/db';
 import { projects } from '@/src/db/schema';
 import { dbProjectToDomain } from '@/src/db/map';
 import { env } from '@/src/lib/env';
+import { runtimeStatus } from '@/src/lib/runtime-status';
 import { DEEP_HEALTH_TIMEOUT_MS, withTimeout } from '@/src/lib/timeout';
 
 /**
@@ -85,12 +86,7 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     ok: true,
-    service: 'noxen',
-    phase: 3,
-    hasDatabase: Boolean(env('DATABASE_URL')),
-    hasHyperdrive: Boolean(hyperdriveConnectionString()),
-    hasClerk: Boolean(env('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY') && env('CLERK_SECRET_KEY')),
-    hasCronSecret: Boolean(env('CRON_SECRET')),
+    ...runtimeStatus({ hasHyperdrive: Boolean(hyperdriveConnectionString()) }),
     ...(deep
       ? {
           monitorsReady,

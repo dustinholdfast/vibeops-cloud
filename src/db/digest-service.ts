@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, lt, or, isNull, sql } from 'drizzle-orm';
 import { isMissingRelationError, requireDb, withDb } from './index';
 import { emailPreferences, projects, workspaceMembers, workspaces } from './schema';
 import { dbProjectToDomain } from './map';
+import { attachActivities } from './project-events';
 import { buildPortfolioReview, REVIEW_WINDOW_DAYS } from '../lib/review';
 import type { WorkspaceDigest } from '../lib/email/render-digest';
 import { isWorkspaceRole } from '../lib/workspace-roles';
@@ -40,6 +41,7 @@ export async function getOrCreatePreferences(userId: string) {
     .values({
       userId,
       weeklyDigest: 1,
+      uptimeAlerts: 1,
       unsubscribeToken: newToken(),
       createdAt: now,
       updatedAt: now,
@@ -133,11 +135,12 @@ export async function buildDigestFor(
     )
     .orderBy(desc(projects.lastTouched));
 
+  const mapped = await attachActivities(rows.map(dbProjectToDomain));
   const byWorkspace = new Map<string, ReturnType<typeof dbProjectToDomain>[]>();
-  for (const row of rows) {
-    const list = byWorkspace.get(row.workspaceId) ?? [];
-    list.push(dbProjectToDomain(row));
-    byWorkspace.set(row.workspaceId, list);
+  for (let i = 0; i < rows.length; i++) {
+    const list = byWorkspace.get(rows[i].workspaceId) ?? [];
+    list.push(mapped[i]);
+    byWorkspace.set(rows[i].workspaceId, list);
   }
 
   const digests: WorkspaceDigest[] = [];

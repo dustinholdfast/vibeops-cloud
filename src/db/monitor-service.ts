@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { isMissingRelationError, requireDb, withDb } from './index';
 import { optionalTimestampToIso, timestampToDate, timestampToIso, timestampToMs } from './map';
-import { projectChecks, projectMonitors, projects } from './schema';
+import { emailPreferences, projectChecks, projectMonitors, projects, workspaceMembers } from './schema';
 import { ProjectError } from '../lib/project-validation';
 import { can } from '../lib/workspace-roles';
 import type { Scope } from './project-service';
@@ -546,22 +546,25 @@ export async function alertRecipients(workspaceId: string): Promise<string[]> {
   // workspace has no member rows" (personal) and "every member opted out" are
   // different answers, and collapsing them would mail the workspace id as if it
   // were a user.
-  const members = (await db.execute(sql`
-    select distinct m.user_id as user_id, coalesce(p.uptime_alerts, 1) as alerts
-    from workspace_members m
-    left join email_preferences p on p.user_id = m.user_id
-    where m.workspace_id = ${workspaceId}
-  `)) as unknown as { user_id: string; alerts: number }[];
+  const members = await db
+    .select({
+      userId: workspaceMembers.userId,
+      alerts: emailPreferences.uptimeAlerts,
+    })
+    .from(workspaceMembers)
+    .leftJoin(emailPreferences, eq(emailPreferences.userId, workspaceMembers.userId))
+    .where(eq(workspaceMembers.workspaceId, workspaceId));
 
   if (members.length > 0) {
-    return members.filter((row) => Number(row.alerts) === 1).map((row) => row.user_id);
+    return members.filter((row) => row.alerts !== 0).map((row) => row.userId);
   }
 
-  const owner = (await db.execute(sql`
-    select uptime_alerts from email_preferences where user_id = ${workspaceId}
-  `)) as unknown as { uptime_alerts: number }[];
+  const [owner] = await db
+    .select({ uptimeAlerts: emailPreferences.uptimeAlerts })
+    .from(emailPreferences)
+    .where(eq(emailPreferences.userId, workspaceId));
 
-  return owner.length === 0 || Number(owner[0].uptime_alerts) === 1 ? [workspaceId] : [];
+  return !owner || owner.uptimeAlerts === 1 ? [workspaceId] : [];
 }
 
 /**
@@ -571,7 +574,10 @@ export async function alertRecipients(workspaceId: string): Promise<string[]> {
  */
 export async function alertStorageReady(): Promise<boolean> {
   try {
-    await requireDb().execute(sql`select uptime_alerts from email_preferences limit 1`);
+    await requireDb()
+      .select({ uptimeAlerts: emailPreferences.uptimeAlerts })
+      .from(emailPreferences)
+      .limit(1);
     return true;
   } catch {
     return false;
@@ -580,11 +586,12 @@ export async function alertStorageReady(): Promise<boolean> {
 
 /** Whether a user currently receives uptime alerts. Defaults to yes. */
 export async function getUptimeAlerts(userId: string): Promise<boolean> {
-  const rows = (await requireDb().execute(sql`
-    select uptime_alerts from email_preferences where user_id = ${userId}
-  `)) as unknown as { uptime_alerts: number }[];
+  const [row] = await requireDb()
+    .select({ uptimeAlerts: emailPreferences.uptimeAlerts })
+    .from(emailPreferences)
+    .where(eq(emailPreferences.userId, userId));
 
-  return rows.length === 0 || Number(rows[0].uptime_alerts) === 1;
+  return !row || row.uptimeAlerts === 1;
 }
 
 /** Drops check rows past the retention window. Returns how many went. */
@@ -605,11 +612,12 @@ export async function pruneChecks(now: Date = new Date()): Promise<number> {
 
 /** Turns uptime alerts on or off for one user. */
 export async function setUptimeAlerts(userId: string, enabled: boolean) {
-  await requireDb().execute(sql`
-    update email_preferences
-       set uptime_alerts = ${enabled ? 1 : 0}, updated_at = now()
-     where user_id = ${userId}
-  `);
+  const { getOrCreatePreferences } = await import('./digest-service');
+  await getOrCreatePreferences(userId);
+  await requireDb()
+    .update(emailPreferences)
+    .set({ uptimeAlerts: enabled ? 1 : 0, updatedAt: new Date() })
+    .where(eq(emailPreferences.userId, userId));
   return { uptimeAlerts: enabled };
 }
 
@@ -617,12 +625,11 @@ export async function setUptimeAlerts(userId: string, enabled: boolean) {
 export async function unsubscribeAlertsByToken(token: string): Promise<boolean> {
   if (!/^[a-f0-9]{48}$/.test(token)) return false;
 
-  const rows = (await requireDb().execute(sql`
-    update email_preferences
-       set uptime_alerts = 0, updated_at = now()
-     where unsubscribe_token = ${token}
-    returning user_id
-  `)) as unknown as { user_id: string }[];
+  const rows = await requireDb()
+    .update(emailPreferences)
+    .set({ uptimeAlerts: 0, updatedAt: new Date() })
+    .where(eq(emailPreferences.unsubscribeToken, token))
+    .returning({ userId: emailPreferences.userId });
 
   return rows.length > 0;
 }

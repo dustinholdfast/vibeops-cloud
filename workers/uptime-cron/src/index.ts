@@ -1,10 +1,14 @@
 /**
- * Calls the VibeOps uptime sweep on a schedule.
+ * Schedules VibeOps Cloud cron routes.
  *
  * On workers.dev, same-zone Worker-to-Worker via global fetch returns Cloudflare
  * 1042 unless `global_fetch_strictly_public` is set — that flag is in
  * wrangler.jsonc. A VIBEOPS service binding is an alternative path used when
  * present; either way this Worker stays a scheduler and nothing more.
+ *
+ * Two triggers share this Worker so digest mail does not depend on Vercel Cron:
+ *   */5 * * * *   uptime sweep
+ *   0 13 * * 1    weekly digest (Monday 13:00 UTC)
  */
 
 export type Env = {
@@ -15,14 +19,17 @@ export type Env = {
 
 const TIMEOUT_MS = 90_000;
 
-type SweepResult = {
-  checked?: number;
-  down?: number;
-  alerts?: number;
-  mode?: string;
-  due?: number;
-  deferred?: number;
-};
+export const JOBS = {
+  uptime: { cron: '*/5 * * * *', path: '/api/cron/uptime?send=1' },
+  digest: { cron: '0 13 * * 1', path: '/api/cron/weekly-digest?send=1' },
+} as const;
+
+export type JobName = keyof typeof JOBS;
+
+function jobForCron(expr: string): JobName {
+  if (expr === JOBS.digest.cron) return 'digest';
+  return 'uptime';
+}
 
 function configured(
   env: Env
@@ -40,25 +47,22 @@ function configured(
   };
 }
 
-async function runSweep(
-  env: Env
-): Promise<SweepResult & { ok: true; elapsedMs: number; via: string }> {
+async function runJob(
+  env: Env,
+  job: JobName
+): Promise<{ ok: true; job: JobName; elapsedMs: number; via: string; body: unknown }> {
   const cfg = configured(env);
   if (!cfg.ok) {
     throw new Error(`${cfg.missing.join(' and ')} must be configured.`);
   }
 
-  const url = `${cfg.appUrl}/api/cron/uptime?send=1`;
+  const url = `${cfg.appUrl}${JOBS[job].path}`;
   const startedAt = Date.now();
   const request = new Request(url, {
     method: 'GET',
     headers: { authorization: `Bearer ${cfg.secret}` },
   });
 
-  // Prefer public fetch when APP_URL is set. With
-  // global_fetch_strictly_public this reaches the other Worker on workers.dev
-  // instead of error 1042. Fall back to the service binding when APP_URL is
-  // absent (custom wiring).
   let via = 'url';
   let response: Response;
   if (env.APP_URL) {
@@ -74,33 +78,23 @@ async function runSweep(
 
   if (!response.ok) {
     const detail = (await response.text().catch(() => '')).slice(0, 300);
-    throw new Error(`Sweep returned ${response.status} after ${elapsed}ms: ${detail}`);
+    throw new Error(`${job} returned ${response.status} after ${elapsed}ms: ${detail}`);
   }
 
-  const body = (await response.json().catch(() => ({}))) as SweepResult;
-
-  return {
-    ok: true,
-    elapsedMs: elapsed,
-    via,
-    mode: body.mode ?? 'unknown',
-    checked: body.checked ?? 0,
-    down: body.down ?? 0,
-    alerts: body.alerts ?? 0,
-    due: body.due,
-    deferred: body.deferred,
-  };
+  const body = (await response.json().catch(() => ({}))) as unknown;
+  return { ok: true, job, elapsedMs: elapsed, via, body };
 }
 
 export default {
-  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
+  async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext) {
+    const job = jobForCron(event.cron);
     ctx.waitUntil(
-      runSweep(env)
+      runJob(env, job)
         .then((result) => {
           console.log(JSON.stringify(result));
         })
         .catch((error) => {
-          console.error('[uptime-cron]', error instanceof Error ? error.message : error);
+          console.error(`[cron:${job}]`, error instanceof Error ? error.message : error);
           throw error;
         })
     );
@@ -123,10 +117,16 @@ export default {
         appUrl: cfg.appUrl,
         hasCronSecret: true,
         hasServiceBinding: Boolean(env.VIBEOPS),
+        jobs: JOBS,
       });
     }
 
-    if (request.method === 'POST' && pathname === '/run') {
+    const manual: Record<string, JobName> = {
+      '/run': 'uptime',
+      '/run-digest': 'digest',
+    };
+    const job = request.method === 'POST' ? manual[pathname] : undefined;
+    if (job) {
       const cfg = configured(env);
       if (!cfg.ok) {
         return Response.json(
@@ -138,12 +138,12 @@ export default {
         return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
       }
       try {
-        const result = await runSweep(env);
+        const result = await runJob(env, job);
         console.log(JSON.stringify({ ...result, trigger: 'fetch' }));
         return Response.json(result);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        console.error('[uptime-cron]', message);
+        console.error(`[cron:${job}]`, message);
         return Response.json({ ok: false, error: message }, { status: 502 });
       }
     }

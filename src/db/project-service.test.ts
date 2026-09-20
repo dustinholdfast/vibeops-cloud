@@ -209,6 +209,7 @@ before(async () => {
   await applySql(LEGACY_SCHEMA);
   await applySql(readFileSync('scripts/reliable-saves.sql', 'utf8'));
   await applySql(readFileSync('scripts/team-workspaces.sql', 'utf8'));
+  await applySql(readFileSync('scripts/project-events.sql', 'utf8'));
   service = await import('./project-service');
   ProjectError = (await import('../lib/project-validation')).ProjectError;
 });
@@ -219,7 +220,7 @@ after(async () => {
 });
 
 beforeEach(async () => {
-  await sql`TRUNCATE projects, subscriptions, workspaces, workspace_members, workspace_invites`;
+  await sql`TRUNCATE projects, subscriptions, workspaces, workspace_members, workspace_invites, project_events`;
 });
 
 describe('migration', () => {
@@ -234,6 +235,22 @@ describe('migration', () => {
     assert.equal(columns[0].column_name, 'last_mutation_id');
     assert.equal(columns[1].column_name, 'version');
     assert.match(columns[1].column_default ?? '', /1/);
+  });
+
+  it('stores new activity in project_events instead of JSONB', async () => {
+    const created = await service.createProject(personal(USER), {
+      id: 'p_events',
+      name: 'Evented',
+    });
+    const stored = await sql<{ activity: unknown }[]>`
+      SELECT activity FROM projects WHERE id = 'p_events'
+    `;
+    const events = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM project_events WHERE project_id = 'p_events'
+    `;
+    assert.deepEqual(stored[0].activity, []);
+    assert.equal(events[0].n, 1);
+    assert.equal(created.project.activity[0]?.type, 'created');
   });
 
   it('starts pre-existing rows at version 1', async () => {
