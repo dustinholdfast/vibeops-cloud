@@ -11,7 +11,14 @@
    * from. Verified locally: with DATABASE_URL set as a var, /api/health
    * reports hasDatabase true.
    */
-  "compatibility_flags": ["nodejs_compat"],
+  /**
+   * `global_fetch_strictly_public` is required for uptime probes. Without it,
+   * Worker fetch() to same-account *.workers.dev / *.pages.dev is routed to
+   * the zone origin (often empty) and returns a silent HTTP 404 — while the
+   * same URL returns 200 from a laptop. With the flag, fetch goes through
+   * Cloudflare's public front door like a normal internet request.
+   */
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
 
   "assets": {
     "directory": ".open-next/assets",
