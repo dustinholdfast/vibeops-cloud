@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 360" role="img" aria-label="Noxen Cloud">
+  <title>Noxen Cloud — dark lockup</title>
+  
+  <defs>
+    <radialGradient id="corona-lockup-dark" cx="50%" cy="50%" r="50%">
+      <stop offset="52%" stop-color="#F5F3FF" stop-opacity="0"/>
+      <stop offset="56%" stop-color="#F5F3FF" stop-opacity="1"/>
+      <stop offset="62%" stop-color="#A78BFA" stop-opacity="0.95"/>
+      <stop offset="74%" stop-color="#4F46E5" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#312E81" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="disk-lockup-dark" cx="38%" cy="34%" r="70%">
+      <stop offset="0%" stop-color="#14141C"/>
+      <stop offset="100%" stop-color="#08080C"/>
+    </radialGradient>
+  </defs>
+
+  <text x="56" y="198" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="132" font-weight="560" fill="#FFFFFF">N</text>
+  
+  <g>
+    <circle cx="248" cy="168" r="92.56" fill="url(#corona-lockup-dark)"/>
+    <circle cx="248" cy="168" r="54.00" fill="none" stroke="#F5F3FF" stroke-width="2.2"/>
+    <circle cx="248" cy="168" r="52.00" fill="url(#disk-lockup-dark)"/>
+    
+    <g transform="translate(292.10,140.44)">
+      <polygon points="0,-14 2.2,-2.2 14,0 2.2,2.2 0,14 -2.2,2.2 -14,0 -2.2,-2.2" fill="#FFFFFF"/>
+      <circle r="2.4" fill="#FFFFFF"/>
+    </g>
+    <circle cx="202.97" cy="194.00" r="1.6" fill="#FFFFFF" fill-opacity="0.85"/>
+  </g>
+  <text x="318" y="198" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="132" font-weight="560" fill="#FFFFFF">xen</text>
+  <text x="430" y="268" text-anchor="middle" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="22" font-weight="500" letter-spacing="12" fill="#B0A8C4">CLOUD</text>
+</svg>

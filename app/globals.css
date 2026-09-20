@@ -44,6 +44,11 @@ html.dark {
   color-scheme: dark;
 }
 
+html.dark .brand-lockup-light,
+html.light .brand-lockup-dark {
+  display: none;
+}
+
 * {
   box-sizing: border-box;
 }

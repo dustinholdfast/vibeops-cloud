@@ -6,6 +6,7 @@ import { useProjectStore } from '../store/useProjectStore';
 import type { FilterStage } from '../types';
 import { cn } from '../lib/utils';
 import { useSidebarCollapsed } from '../lib/useSidebarCollapsed';
+import { SidebarBrand } from './BrandLockup';
 import { WorkspaceMenu } from './WorkspaceMenu';
 import {
   LayoutGrid,
@@ -86,23 +87,7 @@ export function Sidebar({
           collapsed && 'lg:w-14'
         )}
       >
-        <div className={cn('px-3.5 py-4', collapsed && 'lg:px-2')}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/logo.png"
-            alt="Noxen"
-            className={cn('w-full h-auto object-contain', collapsed && 'lg:hidden')}
-          />
-          <span
-            className={cn(
-              'hidden h-8 w-8 mx-auto items-center justify-center rounded-lg bg-purple/15 text-sm font-semibold text-purple-light',
-              collapsed && 'lg:flex'
-            )}
-            aria-hidden
-          >
-            N
-          </span>
-        </div>
+        <SidebarBrand collapsed={collapsed} />
 
         <p
           className={cn(
