@@ -88,6 +88,16 @@ export default async function HomePage() {
           ))}
         </div>
 
+        <div className="mt-16 max-w-xl w-full text-center space-y-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-text-dim">What is Noxen?</h2>
+          <p className="text-sm text-text-muted leading-relaxed">
+            Noxen is a focused project tracker for builders who want to cut through the noise. 
+            It surfaces what's actually moving, what's stalling, and what needs your attention right now. 
+            Unlike traditional tools that just store tasks, Noxen tracks the velocity and health of 
+            your entire portfolio.
+          </p>
+        </div>
+
         <p className="mt-10 text-xs text-text-dim">
           Prefer offline? Use{' '}
           <a
