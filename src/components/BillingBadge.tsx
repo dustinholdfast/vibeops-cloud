@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { getActiveWorkspace, parseJson, WORKSPACE_HEADER } from '@/src/lib/api';
+import { YearlyCheckoutButton } from './YearlyCheckoutButton';
 import { useProjectStore } from '../store/useProjectStore';
 
 type Status = {
@@ -95,9 +95,9 @@ export function BillingBadge() {
       {!status.manageable ? (
         <p className="text-[11px] text-text-dim">Billing is managed by the owner.</p>
       ) : status.plan === 'free' ? (
-        <Link href="/pricing" className="block text-center text-[11px] font-medium text-purple-light hover:underline">
-          Upgrade to Pro
-        </Link>
+        <YearlyCheckoutButton className="block w-full text-center text-[11px] font-medium text-purple-light hover:underline disabled:opacity-60">
+          Upgrade yearly — $120
+        </YearlyCheckoutButton>
       ) : (
         <button
           type="button"

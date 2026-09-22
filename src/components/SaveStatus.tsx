@@ -1,6 +1,9 @@
 'use client';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { getActiveWorkspace, parseJson, WORKSPACE_HEADER } from '../lib/api';
 import { useProjectStore, type Draft } from '../store/useProjectStore';
+import { YearlyCheckoutButton } from './YearlyCheckoutButton';
 
 const FIELD_LABELS: Record<string, string> = {
   name: 'Name',
@@ -143,16 +146,40 @@ export function WorkspaceSaveNotice() {
   const code = useProjectStore((s) => s.operationCode);
   const busy = useProjectStore((s) => s.operationBusy);
   const open = useProjectStore((s) => s.openDrawer);
+  const paywall = code === 'PLAN_LIMIT' || code === 'PRO_REQUIRED';
+  const [canBill, setCanBill] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!paywall) return;
+    let live = true;
+    const workspace = getActiveWorkspace();
+    void fetch('/api/billing/status', {
+      credentials: 'include',
+      headers: workspace ? { [WORKSPACE_HEADER]: workspace } : undefined,
+    })
+      .then((res) => (res.ok ? parseJson<{ manageable?: boolean }>(res) : null))
+      .then((data) => {
+        if (live) setCanBill(data?.manageable !== false);
+      })
+      .catch(() => {
+        if (live) setCanBill(true);
+      });
+    return () => {
+      live = false;
+    };
+  }, [paywall]);
   const unconfirmed = Object.entries(drafts).filter(([, d]) => d.status !== 'saving');
   if (!unconfirmed.length && !error && !busy) return null;
   return (
     <div className="px-6 py-3 border-b border-warning/30 bg-warning/5 text-sm space-y-2" role="status">
       {busy && <p>Saving workspace changes…</p>}
       {error && <p>{error}</p>}
-      {code === 'PLAN_LIMIT' && (
-        <Link className="underline text-purple-light" href="/pricing">
-          View Pro plans
-        </Link>
+      {paywall && canBill !== false && (
+        <YearlyCheckoutButton className="underline text-purple-light disabled:opacity-60">
+          Continue to yearly checkout — $120
+        </YearlyCheckoutButton>
+      )}
+      {paywall && canBill === false && (
+        <p className="text-xs text-text-dim">The workspace owner has to upgrade before this can be added.</p>
       )}
       {code === 'UNAUTHORIZED' && (
         <Link className="underline text-purple-light" href="/sign-in">
