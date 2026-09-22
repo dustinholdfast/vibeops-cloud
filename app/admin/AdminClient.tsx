@@ -8,6 +8,7 @@ import {
   Copy,
   CreditCard,
   Gift,
+  KeyRound,
   LayoutDashboard,
   Search,
   Shield,
@@ -34,7 +35,11 @@ type Account = {
 type PlanFilter = 'all' | 'free' | 'pro' | 'complimentary' | 'stripe';
 
 async function readBody(res: Response) {
-  return (await res.json().catch(() => ({}))) as { error?: string; accounts?: Account[] };
+  return (await res.json().catch(() => ({}))) as {
+    error?: string;
+    accounts?: Account[];
+    email?: string;
+  };
 }
 
 function initials(account: Account) {
@@ -145,6 +150,34 @@ export function AdminClient() {
       }
       showToast(plan === 'pro' ? 'Pro granted' : cancelStripe ? 'Stripe canceled, set Free' : 'Set to Free');
       await load();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const sendPasswordReset = async (account: Account) => {
+    const label = account.email ?? account.userId;
+    if (!account.email) {
+      showToast('That account has no email address');
+      return;
+    }
+    if (!confirm(`Send a password reset link to ${label}? It expires in one hour.`)) {
+      return;
+    }
+    setBusyId(account.userId);
+    try {
+      const res = await fetch('/api/admin/accounts/password-reset', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: account.userId }),
+      });
+      const body = await readBody(res);
+      if (!res.ok) {
+        showToast(body.error || 'Could not send the reset');
+        return;
+      }
+      showToast(`Reset sent to ${body.email || account.email}`);
     } finally {
       setBusyId(null);
     }
@@ -431,6 +464,15 @@ export function AdminClient() {
                                 Cancel Stripe
                               </button>
                             )}
+                            <button
+                              type="button"
+                              disabled={busyId === account.userId || !account.email}
+                              onClick={() => void sendPasswordReset(account)}
+                              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs text-text-muted hover:text-text disabled:opacity-40"
+                            >
+                              <KeyRound size={12} aria-hidden />
+                              {busyId === account.userId ? 'Sending…' : 'Send password reset'}
+                            </button>
                             <button
                               type="button"
                               disabled={busyId === account.userId}

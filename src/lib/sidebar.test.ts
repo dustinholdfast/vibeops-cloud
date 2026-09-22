@@ -14,7 +14,7 @@ class MemoryStorage {
 
 test('sidebar collapse persists as 1 or 0', () => {
   const storage = new MemoryStorage();
-  (globalThis as { localStorage?: MemoryStorage }).localStorage = storage;
+  (globalThis as unknown as { localStorage?: MemoryStorage }).localStorage = storage;
 
   assert.equal(readStoredSidebarCollapsed(), false);
   persistSidebarCollapsed(true);

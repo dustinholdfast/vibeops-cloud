@@ -21,6 +21,7 @@ Local edition: [dustinholdfast/vibeops](https://github.com/dustinholdfast/vibeop
 | Staging on workers.dev | ✅ rollback host |
 | Custom domain `noxencloud.com` | ✅ Worker custom domains (apex + www) |
 | Clerk production (`pk_live_` + user-id mapping) | ⏳ see CLERK_PRODUCTION_CUTOVER.md |
+| Admin password reset email | ✅ `/admin` → Send password reset |
 
 ---
 
@@ -59,6 +60,13 @@ npm run dev   # http://localhost:3001
 
 See `.env.example` — includes `NEXT_PUBLIC_APP_URL` (local `http://localhost:3001`
 or your HTTPS production custom domain).
+
+### Admin console
+
+`/admin` is allowlisted with `ADMIN_USER_IDS` and/or `ADMIN_EMAILS`. Operators
+can search accounts, grant or revoke Pro, delete a user, or send a one-hour
+password reset email. Reset mail uses the same Resend setup as the digest
+(`RESEND_API_KEY` + `EMAIL_FROM`) and refuses to send if those are missing.
 
 Production Clerk requires a custom domain and `pk_live_…` / `sk_live_…` keys.
 Before changing keys, follow [CLERK_PRODUCTION_CUTOVER.md](./CLERK_PRODUCTION_CUTOVER.md)
