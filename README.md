@@ -1,5 +1,7 @@
 # Noxen Cloud
 
+Android companion app: [mobile/README.md](./mobile/README.md).
+
 **Hosted, multi-tenant edition of Noxen** — accounts, synced projects, Stripe subscriptions.
 
 Local edition: [dustinholdfast/vibeops](https://github.com/dustinholdfast/vibeops)
