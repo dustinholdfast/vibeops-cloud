@@ -238,7 +238,7 @@ describe('migration', () => {
   });
 
   it('stores new activity in project_events instead of JSONB', async () => {
-    const created = await service.createProject(personal(USER), {
+    const created = await service.createProject(scope(USER), {
       id: 'p_events',
       name: 'Evented',
     });
