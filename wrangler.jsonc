@@ -30,6 +30,23 @@
     { "pattern": "www.noxencloud.com", "custom_domain": true }
   ],
 
+  /**
+   * Public origin for links we email or hand back (password reset, invites,
+   * digest, uptime alerts, Stripe return URLs). Read at runtime by
+   * `publicAppOrigin`. Not a secret — the host is already public.
+   *
+   * This must not be `NEXT_PUBLIC_APP_URL`. Next inlines that name at build
+   * time, and production bundles were built with the workers.dev host, so
+   * reset emails kept using it even after the custom domain was attached.
+   * `workers_dev` stays enabled as rollback; it is not this origin.
+   *
+   * Replace only if the public host changes:
+   *   npx wrangler secret put APP_URL
+   */
+  "vars": {
+    "APP_URL": "https://noxencloud.com"
+  },
+
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
@@ -59,7 +76,8 @@
    *   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY  also needed at build time
    *   STRIPE_PRICE_PRO_MONTHLY
    *   STRIPE_PRICE_PRO_YEARLY
-   *   NEXT_PUBLIC_APP_URL                 also needed at build time
+   *   NEXT_PUBLIC_APP_URL                 build time (client). Outbound links
+   *                                       use the APP_URL var above, not this.
    *   RESEND_API_KEY
    *   EMAIL_FROM
    *   CRON_SECRET

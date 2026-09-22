@@ -3,6 +3,7 @@ import { requireAdmin } from '@/src/lib/admin';
 import { sendAdminPasswordReset } from '@/src/lib/admin-password-reset';
 import { projectErrorResponse } from '@/src/lib/project-errors';
 import { ProjectError } from '@/src/lib/project-validation';
+import { publicAppOrigin } from '@/src/lib/public-url';
 
 export async function POST(req: Request) {
   try {
@@ -10,7 +11,7 @@ export async function POST(req: Request) {
     const body = (await req.json()) as { userId?: string };
     const userId = body.userId?.trim();
     if (!userId) throw new ProjectError(400, 'VALIDATION', 'userId is required.');
-    const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? new URL(req.url).origin).replace(/\/$/, '');
+    const appUrl = publicAppOrigin(req.url);
     const result = await sendAdminPasswordReset({
       actorUserId,
       targetUserId: userId,

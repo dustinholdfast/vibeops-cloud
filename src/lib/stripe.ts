@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import { publicAppOrigin } from './public-url';
 
 let _stripe: Stripe | null = null;
 
@@ -37,13 +38,7 @@ export function getWebhookCryptoProvider() {
 }
 
 export function getAppUrl(): string {
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '');
-  }
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`.replace(/\/$/, '');
-  }
-  return 'http://localhost:3001';
+  return publicAppOrigin();
 }
 
 export function getProPriceId(interval: 'month' | 'year'): string {

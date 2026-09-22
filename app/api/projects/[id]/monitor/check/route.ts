@@ -10,6 +10,7 @@ import { probe } from '@/src/lib/uptime/probe';
 import { probeContextFor } from '@/src/lib/uptime/probe-context';
 import { sendAlerts } from '@/src/lib/uptime/alerting';
 import { projectErrorResponse } from '@/src/lib/project-errors';
+import { publicAppOrigin } from '@/src/lib/public-url';
 import { requireScope } from '@/src/lib/request-scope';
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -55,7 +56,7 @@ export async function POST(req: Request, ctx: Ctx) {
 
     let notified: string[] = [];
     if (transition.alert) {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? new URL(req.url).origin;
+      const appUrl = publicAppOrigin(req.url);
       notified = await sendAlerts({
         recipients: await alertRecipients(monitor.workspaceId),
         kind: transition.alert,

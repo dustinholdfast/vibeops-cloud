@@ -92,8 +92,12 @@ npx wrangler secret put STRIPE_WEBHOOK_SECRET
 npx wrangler secret put NEXT_PUBLIC_APP_URL   # also needed at runtime
 ```
 
-`NEXT_PUBLIC_APP_URL` appears in both lists deliberately: inlined where the
-client needs it, and read at runtime for Stripe redirect URLs.
+`NEXT_PUBLIC_APP_URL` is inlined where the client needs it. It is not what
+password-reset, invite, digest, or alert links use. Those read `APP_URL` at
+runtime (`https://noxencloud.com` in the root `wrangler.jsonc`). A
+`workers.dev` value here does not put `workers.dev` into those emails. To
+point staging mail at this host instead, set `APP_URL` to the workers.dev
+origin (`npx wrangler secret put APP_URL`).
 
 Optional: `RESEND_API_KEY` and `EMAIL_FROM`. Without them, alerts and digests
 report as skipped rather than failing.
