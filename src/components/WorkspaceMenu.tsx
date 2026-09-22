@@ -25,6 +25,7 @@ type BillingStatus = {
   projectCount: number;
   projectLimit: number | null;
   manageable: boolean;
+  viewerPlan?: 'free' | 'pro';
 };
 
 export function WorkspaceMenu({ collapsed = false }: { collapsed?: boolean }) {
@@ -278,7 +279,12 @@ export function WorkspaceMenu({ collapsed = false }: { collapsed?: boolean }) {
 
       {workspaceError && (
         <p role="alert" className="mt-1 px-1 text-xs text-danger">
-          {workspaceError}
+          {workspaceError}{' '}
+          {workspaceError.includes('Pro') && (
+            <Link href="/pricing" className="text-purple-light underline">
+              View plans
+            </Link>
+          )}
         </p>
       )}
 
@@ -362,6 +368,17 @@ export function WorkspaceMenu({ collapsed = false }: { collapsed?: boolean }) {
                   </button>
                 </div>
               </form>
+            ) : billing?.viewerPlan === 'free' ? (
+              <Link
+                href="/pricing"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-text-muted hover:text-text"
+              >
+                <Plus size={14} aria-hidden />
+                New workspace
+                <span className="ml-auto text-[11px] text-purple-light">Pro</span>
+              </Link>
             ) : (
               <MenuItem onClick={() => setCreatingWs(true)} icon={<Plus size={14} />}>
                 New workspace
@@ -407,7 +424,20 @@ export function WorkspaceMenu({ collapsed = false }: { collapsed?: boolean }) {
               </button>
             )}
 
-            {alerts !== null && (
+            {alerts !== null && billing?.plan === 'free' && (
+              <Link
+                href="/pricing"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-text-muted hover:text-text"
+              >
+                <Activity size={14} aria-hidden />
+                <span className="flex-1 text-left">Uptime alert emails</span>
+                <span className="text-[11px] text-purple-light">Pro</span>
+              </Link>
+            )}
+
+            {alerts !== null && billing?.plan !== 'free' && (
               <button
                 type="button"
                 role="menuitem"

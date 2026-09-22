@@ -6,7 +6,7 @@ import { GitHubAuthButton } from '@/src/components/GitHubAuthButton';
 const tiles = [
   { title: 'Three focus cards', body: 'Work on what matters today. Everything else waits its turn.' },
   { title: 'Silent projects surface', body: 'Unfinished work shows up automatically after seven days.' },
-  { title: 'Workspaces', body: 'Personal by default. Invite teammates when you need them.' },
+  { title: 'Workspaces', body: 'Personal is free. A second workspace, and inviting a team into it, is Pro.' },
 ];
 
 export default async function HomePage() {
@@ -57,7 +57,7 @@ export default async function HomePage() {
             Your projects, synced.
           </h1>
           <p className="mt-4 text-text-muted text-base leading-relaxed max-w-lg mx-auto">
-            The same focused tracker as Local — with accounts, workspaces, and Pro when five projects is no longer enough.
+            A daily brief for what deserves today. Pro adds Nox, uptime alert emails, and another workspace.
           </p>
           <div className="mt-8 mx-auto w-full max-w-xs space-y-3">
             {authReady && <GitHubAuthButton label="Continue with GitHub" />}

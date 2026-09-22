@@ -31,7 +31,7 @@ export default async function PricingPage() {
             Simple <span className="text-purple-light">pricing</span>
           </h1>
           <p className="text-text-muted text-sm max-w-md mx-auto">
-            Start free. Upgrade when five projects isn’t enough — same focused tracker, just synced.
+            Start free. Pro adds Nox, uptime alert emails, and a workspace beyond your personal one.
           </p>
         </div>
 

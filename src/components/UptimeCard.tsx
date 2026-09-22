@@ -272,6 +272,7 @@ export function UptimeCard({ project }: { project: Project }) {
           {result.alert === 'down' ? ' · marked down' : ''}
           {result.alert === 'up' ? ' · recovered' : ''}
           {result.notified ? ` · emailed ${result.notified}` : ''}
+          {result.alertsHeld ? ' · email is a Pro feature' : ''}
         </p>
       )}
 

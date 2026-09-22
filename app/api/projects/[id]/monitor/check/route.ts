@@ -12,6 +12,7 @@ import { sendAlerts } from '@/src/lib/uptime/alerting';
 import { projectErrorResponse } from '@/src/lib/project-errors';
 import { publicAppOrigin } from '@/src/lib/public-url';
 import { requireScope } from '@/src/lib/request-scope';
+import { workspacePlan } from '@/src/lib/subscription';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -55,24 +56,30 @@ export async function POST(req: Request, ctx: Ctx) {
     await recordCheck(monitor.projectId, result, transition, checkedAt);
 
     let notified: string[] = [];
+    let alertsHeld = false;
     if (transition.alert) {
-      const appUrl = publicAppOrigin(req.url);
-      notified = await sendAlerts({
-        recipients: await alertRecipients(monitor.workspaceId),
-        kind: transition.alert,
-        projectName: monitor.projectName,
-        url: monitor.url,
-        error: result.error,
-        downForMs:
-          transition.alert === 'up' && monitor.lastStatusChangeAt
-            ? checkedAt.getTime() - monitor.lastStatusChangeAt.getTime()
-            : null,
-        appUrl,
-      }).catch((error) => {
-        // The check itself succeeded; a mail failure must not report it as one.
-        console.error('[uptime] manual check alerting failed', monitor.projectId, error);
-        return [];
-      });
+      const pro = (await workspacePlan(monitor.workspaceId)) === 'pro';
+      if (!pro) {
+        alertsHeld = true;
+      } else {
+        const appUrl = publicAppOrigin(req.url);
+        notified = await sendAlerts({
+          recipients: await alertRecipients(monitor.workspaceId),
+          kind: transition.alert,
+          projectName: monitor.projectName,
+          url: monitor.url,
+          error: result.error,
+          downForMs:
+            transition.alert === 'up' && monitor.lastStatusChangeAt
+              ? checkedAt.getTime() - monitor.lastStatusChangeAt.getTime()
+              : null,
+          appUrl,
+        }).catch((error) => {
+          // The check itself succeeded; a mail failure must not report it as one.
+          console.error('[uptime] manual check alerting failed', monitor.projectId, error);
+          return [];
+        });
+      }
     }
 
     return NextResponse.json({
@@ -87,6 +94,7 @@ export async function POST(req: Request, ctx: Ctx) {
       status: transition.status,
       alert: transition.alert,
       notified: notified.length,
+      alertsHeld,
     });
   } catch (error) {
     return projectErrorResponse(error, 'Could not run that check. Please try again.');
