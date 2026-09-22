@@ -18,6 +18,7 @@ import { useProjectStore } from '../store/useProjectStore';
 import { can } from '../lib/workspace-roles';
 import { cn } from '../lib/utils';
 import { WorkspaceMembers } from './WorkspaceMembers';
+import { YearlyCheckoutButton } from './YearlyCheckoutButton';
 
 type BillingStatus = {
   plan: 'free' | 'pro';
@@ -278,14 +279,14 @@ export function WorkspaceMenu({ collapsed = false }: { collapsed?: boolean }) {
       </button>
 
       {workspaceError && (
-        <p role="alert" className="mt-1 px-1 text-xs text-danger">
-          {workspaceError}{' '}
+        <div role="alert" className="mt-1 px-1 text-xs text-danger">
+          <p>{workspaceError}</p>
           {workspaceError.includes('Pro') && (
-            <Link href="/pricing" className="text-purple-light underline">
-              View plans
-            </Link>
+            <YearlyCheckoutButton className="mt-1 underline text-purple-light disabled:opacity-60">
+              Continue to yearly checkout — $120
+            </YearlyCheckoutButton>
           )}
-        </p>
+        </div>
       )}
 
       {open && (
@@ -369,16 +370,14 @@ export function WorkspaceMenu({ collapsed = false }: { collapsed?: boolean }) {
                 </div>
               </form>
             ) : billing?.viewerPlan === 'free' ? (
-              <Link
-                href="/pricing"
+              <YearlyCheckoutButton
                 role="menuitem"
-                onClick={() => setOpen(false)}
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-text-muted hover:text-text"
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-text-muted hover:text-text disabled:opacity-60"
               >
                 <Plus size={14} aria-hidden />
                 New workspace
-                <span className="ml-auto text-[11px] text-purple-light">Pro</span>
-              </Link>
+                <span className="ml-auto text-[11px] text-purple-light">$120/yr</span>
+              </YearlyCheckoutButton>
             ) : (
               <MenuItem onClick={() => setCreatingWs(true)} icon={<Plus size={14} />}>
                 New workspace
@@ -424,17 +423,18 @@ export function WorkspaceMenu({ collapsed = false }: { collapsed?: boolean }) {
               </button>
             )}
 
-            {alerts !== null && billing?.plan === 'free' && (
-              <Link
-                href="/pricing"
+            {alerts !== null && billing?.plan === 'free' && billing.manageable && (
+              <YearlyCheckoutButton
                 role="menuitem"
-                onClick={() => setOpen(false)}
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-text-muted hover:text-text"
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-text-muted hover:text-text disabled:opacity-60"
               >
                 <Activity size={14} aria-hidden />
                 <span className="flex-1 text-left">Uptime alert emails</span>
-                <span className="text-[11px] text-purple-light">Pro</span>
-              </Link>
+                <span className="text-[11px] text-purple-light">$120/yr</span>
+              </YearlyCheckoutButton>
+            )}
+            {alerts !== null && billing?.plan === 'free' && billing.manageable === false && (
+              <p className="px-2 py-1.5 text-[11px] text-text-dim">Uptime alert emails need the owner on Pro.</p>
             )}
 
             {alerts !== null && billing?.plan !== 'free' && (
@@ -465,15 +465,13 @@ export function WorkspaceMenu({ collapsed = false }: { collapsed?: boolean }) {
             )}
 
             {billing?.manageable && billing.plan === 'free' && (
-              <Link
-                href="/pricing"
+              <YearlyCheckoutButton
                 role="menuitem"
-                onClick={() => setOpen(false)}
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-text-muted hover:text-text"
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-text-muted hover:text-text disabled:opacity-60"
               >
                 <CreditCard size={14} aria-hidden />
-                Upgrade to Pro
-              </Link>
+                Upgrade yearly — $120
+              </YearlyCheckoutButton>
             )}
             {billing?.manageable && billing.plan === 'pro' && (
               <MenuItem onClick={() => void openPortal()} icon={<CreditCard size={14} />}>

@@ -4,9 +4,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, getToolName, isToolUIPart, type UIMessage } from 'ai';
-import Link from 'next/link';
 import { Sparkles, X } from 'lucide-react';
-import { WORKSPACE_HEADER, getActiveWorkspace } from '../lib/api';
+import { WORKSPACE_HEADER, getActiveWorkspace, parseJson } from '../lib/api';
+import { YearlyCheckoutButton } from './YearlyCheckoutButton';
 import { useProjectStore } from '../store/useProjectStore';
 import { cn } from '../lib/utils';
 
@@ -72,6 +72,7 @@ export function CopilotDrawer({ open, onClose }: { open: boolean; onClose: () =>
   const errorText = visibleCopilotError(error);
   const [draft, setDraft] = useState('');
   const [locked, setLocked] = useState(false);
+  const [canBill, setCanBill] = useState<boolean | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const busy = status === 'submitted' || status === 'streaming';
 
@@ -85,6 +86,12 @@ export function CopilotDrawer({ open, onClose }: { open: boolean; onClose: () =>
       .then((res) => (res.ok ? (res.json() as Promise<{ locked?: boolean }>) : null))
       .then((data) => {
         if (live) setLocked(Boolean(data?.locked));
+      })
+      .catch(() => undefined);
+    void fetch('/api/billing/status', { credentials: 'include', headers })
+      .then((res) => (res.ok ? parseJson<{ manageable?: boolean }>(res) : null))
+      .then((data) => {
+        if (live) setCanBill(data?.manageable !== false);
       })
       .catch(() => undefined);
     return () => {
@@ -194,12 +201,13 @@ export function CopilotDrawer({ open, onClose }: { open: boolean; onClose: () =>
                 <p className="text-sm text-text-muted">
                   Nox is a Pro feature for this workspace. The daily brief still runs on Free.
                 </p>
-                <Link
-                  href="/pricing"
-                  className="inline-flex rounded-lg bg-purple px-3 py-1.5 text-sm font-medium text-white"
-                >
-                  Upgrade to Pro
-                </Link>
+                {canBill === false ? (
+                  <p className="text-xs text-text-dim">The workspace owner has to upgrade.</p>
+                ) : (
+                  <YearlyCheckoutButton className="inline-flex rounded-lg bg-purple px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60">
+                    Continue to yearly checkout — $120
+                  </YearlyCheckoutButton>
+                )}
               </div>
             ) : (
             <form
