@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Noxen Cloud",
+    "slug": "noxen-cloud",
+    "scheme": "noxencloud",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/noxen-mark.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.noxencloud.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#0D1020",
+        "foregroundImage": "./assets/noxen-mark.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "@clerk/expo",
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-router"
+    ]
+  }
+}

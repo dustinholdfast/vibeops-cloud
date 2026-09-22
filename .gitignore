@@ -15,6 +15,10 @@ out
 .env
 .env.local
 .env.*.local
+mobile/.env
+mobile/.expo
+mobile/android
+mobile/ios
 
 # debug / ide
 npm-debug.log*
