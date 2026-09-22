@@ -6,6 +6,7 @@ import { projects } from '@/src/db/schema';
 import { dbProjectToDomain } from '@/src/db/map';
 import { env } from '@/src/lib/env';
 import { runtimeStatus } from '@/src/lib/runtime-status';
+import { stripeKeyMode, stripePriceId } from '@/src/lib/stripe';
 import { DEEP_HEALTH_TIMEOUT_MS, withTimeout } from '@/src/lib/timeout';
 
 /**
@@ -84,9 +85,19 @@ export async function GET(req: Request) {
     }
   }
 
+  const billing = url.searchParams.get('billing') === '1';
+  const priceShape = (name: string) => (stripePriceId(env(name)) ? 'price' : env(name) ? 'invalid' : 'missing');
+
   return NextResponse.json({
     ok: true,
     ...runtimeStatus({ hasHyperdrive: Boolean(hyperdriveConnectionString()) }),
+    ...(billing
+      ? {
+          stripeKeyMode: stripeKeyMode(env('STRIPE_SECRET_KEY')),
+          stripePriceMonthly: priceShape('STRIPE_PRICE_PRO_MONTHLY'),
+          stripePriceYearly: priceShape('STRIPE_PRICE_PRO_YEARLY'),
+        }
+      : {}),
     ...(deep
       ? {
           monitorsReady,
