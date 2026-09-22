@@ -9,6 +9,7 @@ import {
 } from '@/src/db/digest-service';
 import { hasSomethingToSay, renderDigest } from '@/src/lib/email/render-digest';
 import { isEmailConfigured, sendEmail } from '@/src/lib/email/send';
+import { publicAppOrigin } from '@/src/lib/public-url';
 
 /**
  * Sends the weekly digest.
@@ -74,7 +75,7 @@ export async function GET(req: Request) {
   }
 
   const now = new Date();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? url.origin;
+  const appUrl = publicAppOrigin(url.href);
 
   try {
     const recipients = (await findDigestRecipients(now)).slice(0, BATCH_LIMIT);

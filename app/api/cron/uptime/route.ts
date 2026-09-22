@@ -12,6 +12,7 @@ import { probe } from '@/src/lib/uptime/probe';
 import { probeContextFor } from '@/src/lib/uptime/probe-context';
 import { sendAlerts } from '@/src/lib/uptime/alerting';
 import { isEmailConfigured } from '@/src/lib/email/send';
+import { publicAppOrigin } from '@/src/lib/public-url';
 
 /**
  * Runs every monitor that is due.
@@ -149,7 +150,7 @@ export async function GET(req: Request) {
   }
 
   const now = new Date();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? url.origin;
+  const appUrl = publicAppOrigin(url.href);
 
   try {
     const due = await dueMonitors(now, BATCH_LIMIT);

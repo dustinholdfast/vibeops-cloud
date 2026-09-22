@@ -101,7 +101,7 @@ No new variables. It reuses:
 
 - `CRON_SECRET` — the uptime endpoint refuses to run without it, exactly like the digest
 - `RESEND_API_KEY` / `EMAIL_FROM` — with these unset, alerts report as skipped instead of sending
-- `NEXT_PUBLIC_APP_URL` — links in alert emails
+- `APP_URL` — links in alert emails (Worker var, `https://noxencloud.com`). A `workers.dev` `NEXT_PUBLIC_APP_URL` is not used for those links.
 
 ---
 

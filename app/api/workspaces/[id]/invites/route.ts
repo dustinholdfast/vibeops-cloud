@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createInvite, listInvites } from '@/src/db/workspace-service';
 import { projectErrorResponse } from '@/src/lib/project-errors';
+import { publicAppOrigin } from '@/src/lib/public-url';
 import { requireUserId } from '@/src/lib/request-scope';
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -22,7 +23,7 @@ export async function POST(req: Request, ctx: Ctx) {
   try {
     const userId = await requireUserId();
     const { invite, token } = await createInvite(userId, (await ctx.params).id, await req.json());
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? new URL(req.url).origin;
+    const base = publicAppOrigin(req.url);
     return NextResponse.json(
       { invite, inviteUrl: `${base}/invite/${token}` },
       { status: 201 }

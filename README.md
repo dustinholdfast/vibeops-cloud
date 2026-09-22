@@ -59,7 +59,9 @@ npm run dev   # http://localhost:3001
 ### Env
 
 See `.env.example` — includes `NEXT_PUBLIC_APP_URL` (local `http://localhost:3001`
-or your HTTPS production custom domain).
+or your HTTPS production custom domain). Password-reset and other emailed
+links use `APP_URL` (the Worker var `https://noxencloud.com` in
+`wrangler.jsonc`), not the host of the request that triggered the send.
 
 ### Admin console
 
@@ -214,4 +216,4 @@ For Cloudflare Workers Builds, use:
 - Deploy command: `npx wrangler deploy`
 - Root directory: `/`
 
-Configure every value from `.env.example` as a Cloudflare runtime variable or secret. The `NEXT_PUBLIC_` values must also be available during the build. Set `NEXT_PUBLIC_APP_URL` to the production Worker or custom-domain URL, then register `https://YOUR_DOMAIN/api/webhooks/stripe` as the Stripe webhook endpoint.
+Configure every value from `.env.example` as a Cloudflare runtime variable or secret. The `NEXT_PUBLIC_` values must also be available during the build. `APP_URL` is already set in `wrangler.jsonc` to `https://noxencloud.com` and is what password-reset, invite, digest, and alert links use. `NEXT_PUBLIC_APP_URL` is still inlined for the client; a `workers.dev` value there does not change those links. Register `https://noxencloud.com/api/webhooks/stripe` as the Stripe webhook endpoint.
