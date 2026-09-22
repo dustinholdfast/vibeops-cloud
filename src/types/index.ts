@@ -127,6 +127,8 @@ export type UptimeCheckResult = {
   alert?: 'up' | 'down' | null;
   /** How many people were emailed, when this check flipped the state. */
   notified?: number;
+  /** A transition happened, but the workspace owner is not Pro, so no email was sent. */
+  alertsHeld?: boolean;
 };
 
 /** One project's row in the portfolio uptime view. */

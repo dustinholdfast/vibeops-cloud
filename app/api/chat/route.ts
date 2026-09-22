@@ -15,7 +15,9 @@ import {
 import { copilotTools } from '@/src/lib/copilot-tools';
 import { env } from '@/src/lib/env';
 import { errorDetail, projectErrorResponse } from '@/src/lib/project-errors';
+import { assertProGate } from '@/src/lib/pro-gates';
 import { requireScope } from '@/src/lib/request-scope';
+import { getUserPlan } from '@/src/lib/subscription';
 import { listProjects } from '@/src/db/project-service';
 import { ProjectError } from '@/src/lib/project-validation';
 
@@ -36,10 +38,12 @@ function copilotModel() {
 
 export async function GET(req: Request) {
   try {
-    await requireScope(req);
+    const scope = await requireScope(req);
+    const billing = await getUserPlan(scope.workspace.ownerUserId);
     return Response.json({
       configured: Boolean(env(COPILOT_KEY_ENV)),
       model: COPILOT_MODEL,
+      locked: billing.plan !== 'pro',
     });
   } catch (error) {
     return projectErrorResponse(error);
@@ -49,6 +53,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const scope = await requireScope(req);
+    assertProGate((await getUserPlan(scope.workspace.ownerUserId)).plan, 'nox');
     const body = (await req.json()) as { messages?: UIMessage[] };
     const messages = Array.isArray(body.messages) ? body.messages.slice(-24) : [];
     if (!messages.length) {

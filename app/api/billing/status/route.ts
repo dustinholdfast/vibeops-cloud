@@ -18,6 +18,7 @@ export async function GET(req: Request) {
     const { userId, workspace } = await requireScope(req);
 
     const billing = await getUserPlan(workspace.ownerUserId);
+    const viewer = userId === workspace.ownerUserId ? billing : await getUserPlan(userId);
     const rows = await requireDb()
       .select({ id: projects.id })
       .from(projects)
@@ -35,6 +36,8 @@ export async function GET(req: Request) {
         role: workspace.role,
       },
       manageable: workspace.ownerUserId === userId,
+      /** The signed-in account's own plan. Creating a workspace bills the creator, not the workspace they are viewing. */
+      viewerPlan: viewer.plan,
     });
   } catch (error) {
     return projectErrorResponse(error);

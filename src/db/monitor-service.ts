@@ -3,6 +3,7 @@ import { isMissingRelationError, requireDb, withDb } from './index';
 import { optionalTimestampToIso, timestampToDate, timestampToIso, timestampToMs } from './map';
 import { emailPreferences, projectChecks, projectMonitors, projects, workspaceMembers } from './schema';
 import { ProjectError } from '../lib/project-validation';
+import { workspacePlan } from '../lib/subscription';
 import { can } from '../lib/workspace-roles';
 import type { Scope } from './project-service';
 import { validateTarget } from '../lib/uptime/target';
@@ -540,6 +541,9 @@ export async function recordCheck(
  * is resolved everywhere else.
  */
 export async function alertRecipients(workspaceId: string): Promise<string[]> {
+  // Checks and the in-app history stay on Free. The email is the paid part.
+  if ((await workspacePlan(workspaceId)) !== 'pro') return [];
+
   const db = requireDb();
 
   // Membership and opt-out are read together but judged separately: "this

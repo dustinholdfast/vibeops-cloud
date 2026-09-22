@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, getToolName, isToolUIPart, type UIMessage } from 'ai';
+import Link from 'next/link';
 import { Sparkles, X } from 'lucide-react';
 import { WORKSPACE_HEADER, getActiveWorkspace } from '../lib/api';
 import { useProjectStore } from '../store/useProjectStore';
@@ -70,8 +71,26 @@ export function CopilotDrawer({ open, onClose }: { open: boolean; onClose: () =>
   });
   const errorText = visibleCopilotError(error);
   const [draft, setDraft] = useState('');
+  const [locked, setLocked] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const busy = status === 'submitted' || status === 'streaming';
+
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    const headers: Record<string, string> = {};
+    const workspaceId = getActiveWorkspace();
+    if (workspaceId) headers[WORKSPACE_HEADER] = workspaceId;
+    void fetch('/api/chat', { credentials: 'include', headers })
+      .then((res) => (res.ok ? (res.json() as Promise<{ locked?: boolean }>) : null))
+      .then((data) => {
+        if (live) setLocked(Boolean(data?.locked));
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [open]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: 'end' });
@@ -170,6 +189,19 @@ export function CopilotDrawer({ open, onClose }: { open: boolean; onClose: () =>
               <div ref={bottomRef} />
             </div>
 
+            {locked ? (
+              <div className="border-t border-border-subtle p-4 space-y-3">
+                <p className="text-sm text-text-muted">
+                  Nox is a Pro feature for this workspace. The daily brief still runs on Free.
+                </p>
+                <Link
+                  href="/pricing"
+                  className="inline-flex rounded-lg bg-purple px-3 py-1.5 text-sm font-medium text-white"
+                >
+                  Upgrade to Pro
+                </Link>
+              </div>
+            ) : (
             <form
               className="border-t border-border-subtle p-4 space-y-2"
               onSubmit={(event) => {
@@ -209,6 +241,7 @@ export function CopilotDrawer({ open, onClose }: { open: boolean; onClose: () =>
                 )}
               </div>
             </form>
+            )}
           </motion.aside>
         </>
       )}

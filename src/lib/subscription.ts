@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { requireDb } from '@/src/db';
-import { subscriptions } from '@/src/db/schema';
+import { subscriptions, workspaces } from '@/src/db/schema';
 import { resolvePlan, type PlanId } from '@/src/lib/plans';
 import { getStripe } from '@/src/lib/stripe';
 
@@ -32,6 +32,17 @@ export async function getUserPlan(userId: string): Promise<{
     cancelAtPeriodEnd: Boolean(row?.cancelAtPeriodEnd),
     stripeCustomerId: row?.stripeCustomerId ?? null,
   };
+}
+
+/** The plan that pays for a workspace. A missing row is the personal workspace, whose id is the owner. */
+export async function workspacePlan(workspaceId: string): Promise<PlanId> {
+  const db = requireDb();
+  const [row] = await db
+    .select({ ownerUserId: workspaces.ownerUserId })
+    .from(workspaces)
+    .where(eq(workspaces.id, workspaceId))
+    .limit(1);
+  return (await getUserPlan(row?.ownerUserId ?? workspaceId)).plan;
 }
 
 export async function ensureSubscriptionRow(userId: string) {

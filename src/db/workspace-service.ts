@@ -2,7 +2,9 @@ import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { requireDb, withDb } from './index';
 import { dropMonitoringFor } from './project-service';
 import { projects, workspaceInvites, workspaceMembers, workspaces } from './schema';
+import { assertProGate } from '../lib/pro-gates';
 import { ProjectError, validateId } from '../lib/project-validation';
+import { getUserPlan } from '../lib/subscription';
 import {
   can,
   canAssignRole,
@@ -233,6 +235,8 @@ export async function requireCapability(
 
 export async function createWorkspace(userId: string, input: unknown) {
   const name = validateWorkspaceName((input as { name?: unknown })?.name);
+  // The personal workspace is created separately. This path is always a second one.
+  assertProGate((await getUserPlan(userId)).plan, 'extraWorkspace');
   const now = new Date();
   const id = generateId('ws_');
 
