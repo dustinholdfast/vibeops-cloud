@@ -4,7 +4,15 @@ import { eq } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { requireDb } from '@/src/db';
 import { subscriptions } from '@/src/db/schema';
-import { getStripe, getAppUrl, getProPriceId, isMissingStripeCustomer } from '@/src/lib/stripe';
+import { env } from '@/src/lib/env';
+import {
+  getStripe,
+  getAppUrl,
+  getProPriceId,
+  isMissingStripeCustomer,
+  isMissingStripePrice,
+  stripeKeyMode,
+} from '@/src/lib/stripe';
 import { ensureSubscriptionRow } from '@/src/lib/subscription';
 import { isRecord } from '@/src/lib/validation';
 
@@ -38,8 +46,12 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ url: session.url });
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Checkout failed';
-    console.error('[billing/checkout]', message);
+    const message = isMissingStripePrice(e)
+      ? `That Price ID is not in this Stripe account. Copy the monthly and yearly price_ IDs again with the dashboard in ${stripeKeyMode(env('STRIPE_SECRET_KEY'))} mode.`
+      : e instanceof Error
+        ? e.message
+        : 'Checkout failed';
+    console.error('[billing/checkout]', e instanceof Error ? e.message : message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
