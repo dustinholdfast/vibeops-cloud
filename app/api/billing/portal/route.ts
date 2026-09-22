@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
-import { getStripe, getAppUrl } from '@/src/lib/stripe';
+import { getStripe, getAppUrl, isMissingStripeCustomer } from '@/src/lib/stripe';
 import { getSubscriptionRow } from '@/src/lib/subscription';
 
 export async function POST() {
@@ -26,6 +26,12 @@ export async function POST() {
 
     return NextResponse.json({ url: session.url });
   } catch (e) {
+    if (isMissingStripeCustomer(e)) {
+      return NextResponse.json(
+        { error: 'That billing account is not in this Stripe account. Upgrade again to create a new one.' },
+        { status: 409 }
+      );
+    }
     const message = e instanceof Error ? e.message : 'Portal failed';
     console.error('[billing/portal]', message);
     return NextResponse.json({ error: message }, { status: 500 });

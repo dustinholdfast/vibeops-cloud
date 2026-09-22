@@ -41,6 +41,14 @@ export function getAppUrl(): string {
   return publicAppOrigin();
 }
 
+/** Stripe still has this id in our database, but the current account does not. */
+export function isMissingStripeCustomer(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const record = error as { code?: unknown; message?: unknown };
+  const message = typeof record.message === 'string' ? record.message : '';
+  return record.code === 'resource_missing' && /no such customer/i.test(message);
+}
+
 export function getProPriceId(interval: 'month' | 'year'): string {
   const id =
     interval === 'year'
