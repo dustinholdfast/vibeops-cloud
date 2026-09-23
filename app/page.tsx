@@ -1,13 +1,20 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getOptionalUserId, isClerkConfigured } from '@/src/lib/auth';
 import { GitHubAuthButton } from '@/src/components/GitHubAuthButton';
+import { LandingPreview } from '@/src/components/LandingPreview';
+import { LANDING_COPY, LANDING_META } from '@/src/lib/marketing/landing';
 
-const tiles = [
-  { title: 'Three focus cards', body: 'Work on what matters today. Everything else waits its turn.' },
-  { title: 'Silent projects surface', body: 'Unfinished work shows up automatically after seven days.' },
-  { title: 'Workspaces', body: 'Personal is free. A second workspace, and inviting a team into it, is Pro.' },
-];
+export const metadata: Metadata = {
+  title: LANDING_META.title,
+  description: LANDING_META.description,
+  openGraph: {
+    title: LANDING_META.title,
+    description: LANDING_META.description,
+    siteName: 'Noxen Cloud',
+  },
+};
 
 export default async function HomePage() {
   const userId = await getOptionalUserId();
@@ -29,10 +36,7 @@ export default async function HomePage() {
         <div className="flex items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="" width={28} height={28} className="w-7 h-7 rounded-full" />
-          <span className="font-semibold tracking-tight">
-            Noxen
-          </span>
-
+          <span className="font-semibold tracking-tight">Noxen</span>
         </div>
         <nav className="flex items-center gap-3 text-sm">
           <Link href="/pricing" className="text-text-muted hover:text-text">
@@ -50,14 +54,16 @@ export default async function HomePage() {
         </nav>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center px-6 pb-16">
+      <main className="flex-1 flex flex-col items-center px-6 pt-8 pb-16 sm:pt-12">
         <div className="max-w-2xl w-full text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-dim">Command center</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-dim">
+            {LANDING_COPY.eyebrow}
+          </p>
           <h1 className="mt-3 text-4xl sm:text-5xl font-semibold tracking-tight text-text">
-            Your projects, synced.
+            {LANDING_COPY.headline}
           </h1>
           <p className="mt-4 text-text-muted text-base leading-relaxed max-w-lg mx-auto">
-            A daily brief for what deserves today. Pro adds Nox, uptime alert emails, and another workspace.
+            {LANDING_COPY.subhead}
           </p>
           <div className="mt-8 mx-auto w-full max-w-xs space-y-3">
             {authReady && <GitHubAuthButton label="Continue with GitHub" />}
@@ -75,12 +81,16 @@ export default async function HomePage() {
                 See pricing
               </Link>
             </div>
-            <p className="text-xs text-text-dim">Free for up to 5 projects · No credit card required</p>
+            <p className="text-xs text-text-dim">{LANDING_COPY.freeNote}</p>
           </div>
         </div>
 
-        <div className="mt-14 grid w-full max-w-3xl grid-cols-1 sm:grid-cols-3 gap-3">
-          {tiles.map((tile) => (
+        <div className="mt-12 w-full max-w-4xl">
+          <LandingPreview />
+        </div>
+
+        <div className="mt-12 grid w-full max-w-3xl grid-cols-1 sm:grid-cols-3 gap-3">
+          {LANDING_COPY.tiles.map((tile) => (
             <article key={tile.title} className="rounded-2xl border border-border bg-surface p-4 text-left">
               <p className="text-sm font-semibold text-text">{tile.title}</p>
               <p className="mt-1 text-xs text-text-muted leading-relaxed">{tile.body}</p>
@@ -89,24 +99,21 @@ export default async function HomePage() {
         </div>
 
         <div className="mt-16 max-w-xl w-full text-center space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-text-dim">What is Noxen?</h2>
-          <p className="text-sm text-text-muted leading-relaxed">
-            Noxen is a focused project tracker for builders who want to cut through the noise. 
-            It surfaces what's actually moving, what's stalling, and what needs your attention right now. 
-            Unlike traditional tools that just store tasks, Noxen tracks the velocity and health of 
-            your entire portfolio.
-          </p>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-text-dim">
+            {LANDING_COPY.explainerTitle}
+          </h2>
+          <p className="text-sm text-text-muted leading-relaxed">{LANDING_COPY.explainer}</p>
         </div>
 
         <p className="mt-10 text-xs text-text-dim">
-          Prefer offline? Use{' '}
+          {LANDING_COPY.localPrompt}{' '}
           <a
-            href="https://github.com/dustinholdfast/vibeops"
+            href={LANDING_COPY.localHref}
             className="text-purple-light hover:underline"
             target="_blank"
             rel="noreferrer"
           >
-            Noxen Local
+            {LANDING_COPY.localLabel}
           </a>
           .
         </p>
