@@ -16,6 +16,7 @@ test('workers.dev with test keys is staging phase 5 when Stripe and cron exist',
   assert.equal(status.environment, 'staging');
   assert.equal(status.productionReady, false);
   assert.equal(status.hasStripe, true);
+  assert.equal(status.stripeMode, 'test');
   assert.ok(status.productionBlockers.some((line) => /custom domain/i.test(line)));
 });
 
@@ -31,6 +32,7 @@ test('noxencloud.com with test keys is staging pending live Clerk keys', () => {
   const status = runtimeStatus({ hasHyperdrive: true });
   assert.equal(status.environment, 'staging');
   assert.equal(status.productionReady, false);
+  assert.equal(status.stripeMode, 'test');
   assert.deepEqual(status.productionBlockers, [
     'Clerk production keys (pk_live_ / sk_live_)',
   ]);
@@ -48,5 +50,6 @@ test('pk_live_ on a custom domain is production-ready', () => {
   const status = runtimeStatus({ hasHyperdrive: true });
   assert.equal(status.environment, 'production');
   assert.equal(status.productionReady, true);
+  assert.equal(status.stripeMode, 'live');
   assert.deepEqual(status.productionBlockers, []);
 });

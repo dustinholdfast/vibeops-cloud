@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { getOptionalUserId, isClerkConfigured } from '@/src/lib/auth';
 import { GitHubAuthButton } from '@/src/components/GitHubAuthButton';
 import { LandingPreview } from '@/src/components/LandingPreview';
+import { SiteFooter } from '@/src/components/SiteFooter';
 import { LANDING_COPY, LANDING_META } from '@/src/lib/marketing/landing';
 
 export const metadata: Metadata = {
@@ -118,6 +119,7 @@ export default async function HomePage() {
           .
         </p>
       </main>
+      <SiteFooter />
     </div>
   );
 }

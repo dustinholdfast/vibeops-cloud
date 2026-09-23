@@ -1,22 +1,10 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server';
 import { env } from '@/src/lib/env';
+import { PUBLIC_ROUTE_MATCHERS } from '@/src/lib/public-routes';
 import { signInUrl } from '@/src/lib/sign-in-redirect';
 
-const isPublicRoute = createRouteMatcher([
-  '/',
-  '/sign-in(.*)',
-  '/sign-up(.*)',
-  '/sso-callback(.*)',
-  '/pricing',
-  '/reset-password(.*)',
-  '/api/health',
-  '/api/auth/social',
-  '/api/auth/reset-password',
-  '/api/webhooks/stripe(.*)',
-  '/api/cron/(.*)',
-  '/api/email/unsubscribe',
-]);
+const isPublicRoute = createRouteMatcher([...PUBLIC_ROUTE_MATCHERS]);
 
 const isApiRoute = createRouteMatcher(['/api(.*)']);
 

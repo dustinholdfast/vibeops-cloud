@@ -43,7 +43,7 @@ npm run dev   # http://localhost:3001
 
 ### Stripe setup
 
-1. [dashboard.stripe.com](https://dashboard.stripe.com) → **Product** “VibeOps Pro”
+1. [dashboard.stripe.com](https://dashboard.stripe.com) → **Product** “Noxen Cloud Pro”
 2. Add **two prices**: monthly $12, yearly $120 (or your amounts)
 3. Copy Price IDs → `STRIPE_PRICE_PRO_MONTHLY` / `STRIPE_PRICE_PRO_YEARLY`
 4. Copy Secret + Publishable keys
@@ -53,7 +53,7 @@ npm run dev   # http://localhost:3001
    stripe listen --forward-to localhost:3001/api/webhooks/stripe
    ```
    Put the `whsec_…` into `STRIPE_WEBHOOK_SECRET`
-7. **Webhooks** (production): endpoint `https://YOUR_DOMAIN/api/webhooks/stripe`  
+7. **Webhooks** (production): endpoint `https://noxencloud.com/api/webhooks/stripe`  
    Events: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`
 
 ### Env

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { PLANS } from '@/src/lib/plans';
 import { getOptionalUserId } from '@/src/lib/auth';
 import { PricingActions } from './PricingActions';
+import { SiteFooter } from '@/src/components/SiteFooter';
 
 export default async function PricingPage() {
   const userId = await getOptionalUserId();
@@ -82,6 +83,7 @@ export default async function PricingPage() {
         <p className="mt-8 text-center text-xs text-text-dim">
           Yearly Pro is available at checkout ({PLANS.pro.priceYearlyLabel}/year). Cancel anytime via the billing portal.
         </p>
+        <SiteFooter />
       </div>
     </div>
   );

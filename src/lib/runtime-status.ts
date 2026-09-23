@@ -10,6 +10,7 @@ export type RuntimeStatus = {
   hasHyperdrive: boolean;
   hasClerk: boolean;
   hasStripe: boolean;
+  stripeMode: 'live' | 'test' | 'mixed' | 'missing';
   hasCronSecret: boolean;
 };
 
@@ -44,7 +45,10 @@ export function runtimeStatus(opts: { hasHyperdrive: boolean }): RuntimeStatus {
   const publishable = env('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY') ?? '';
   const hasDatabase = Boolean(env('DATABASE_URL'));
   const hasClerk = Boolean(publishable && env('CLERK_SECRET_KEY'));
-  const hasStripe = Boolean(env('STRIPE_SECRET_KEY') && env('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY'));
+  const stripeSecret = env('STRIPE_SECRET_KEY') ?? '';
+  const stripePublishable = env('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY') ?? '';
+  const hasStripe = Boolean(stripeSecret && stripePublishable);
+  const stripeMode = stripeKeyMode(stripeSecret, stripePublishable);
   const hasCronSecret = Boolean(env('CRON_SECRET'));
   const host = hostname(env('NEXT_PUBLIC_APP_URL'));
   const liveKeys = publishable.startsWith('pk_live_');
@@ -73,6 +77,22 @@ export function runtimeStatus(opts: { hasHyperdrive: boolean }): RuntimeStatus {
     hasHyperdrive: opts.hasHyperdrive,
     hasClerk,
     hasStripe,
+    stripeMode,
     hasCronSecret,
   };
+}
+
+function stripeKeyMode(
+  secret: string,
+  publishable: string
+): RuntimeStatus['stripeMode'] {
+  const secretLive = secret.startsWith('sk_live_');
+  const secretTest = secret.startsWith('sk_test_');
+  const publishableLive = publishable.startsWith('pk_live_');
+  const publishableTest = publishable.startsWith('pk_test_');
+  if (!secret && !publishable) return 'missing';
+  if ((secretLive && publishableTest) || (secretTest && publishableLive)) return 'mixed';
+  if (secretLive || publishableLive) return 'live';
+  if (secretTest || publishableTest) return 'test';
+  return 'missing';
 }

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { SiteFooter } from './SiteFooter';
 
 export function AuthFrame({
   title,
@@ -24,6 +25,7 @@ export function AuthFrame({
         <p className="mt-1 mb-5 text-sm text-text-muted">{subtitle}</p>
         {children}
       </div>
+      <SiteFooter />
     </div>
   );
 }
